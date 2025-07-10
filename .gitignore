@@ -1,0 +1,47 @@
+# 👟 Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyw
+
+# 🔥 Bytecode and logs
+*.log
+*.out
+
+# 🧪 Virtual environments
+env/
+venv/
+ENV/
+VENV/
+*.env
+
+# 💾 OS-specific clutter
+.DS_Store
+Thumbs.db
+
+# 📦 Dependency folders
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# 🚧 IDE config files
+.vscode/
+.idea/
+*.swp
+
+# 🔐 Credentials or config overrides
+*.sqlite3
+*.db
+*.bak
+*.ini
+*.cfg
+
+# 📝 Project management extras
+*.csv
+*.xlsx
+
+# 🚀 Optional — exclude server test input files
+test_input.txt
+*.json
