@@ -2,11 +2,11 @@
 import socket
 import time
 from datetime import datetime, timedelta
-from Feed import get_xauusd_price  # Capital "F" as per your file name
+from Feed import get_xauusd_price
 from Telegramalert import send_telegram_alert
 
-SUPPORT = 3250
-RESISTANCE = 3345
+SUPPORT = 3262
+RESISTANCE = 3362
 prev_price = 3305
 prev_candle_size = 1
 prev_direction = None
@@ -29,6 +29,13 @@ def wait_until_next_quarter():
     wait_seconds = (next_time - now).total_seconds()
     print(f"⏳ Waiting until {next_time.strftime('%H:%M')} ({int(wait_seconds)}s)...")
     time.sleep(wait_seconds)
+
+def log_alert(message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    formatted = f"[{timestamp}] {message}"
+    print(formatted)
+    with open("server_alerts_log.txt", "a",encoding="utf-8") as log_file:
+        log_file.write(formatted + "\n")
 
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.bind(('localhost', 65432))
@@ -83,22 +90,22 @@ while True:
 
         if candle_size >= 4:
             message = f"⚡ High Volatility Detected (Paused)! Size: ${candle_size}"
-            conn.sendall(message.encode('utf-8'))
-            send_telegram_alert(message)
         elif wick_reversal:
             message = f"🔄 Wick Reversal Triggered at ${current_price}"
-            conn.sendall(message.encode('utf-8'))
-            send_telegram_alert(message)
         elif reversal:
             message = f"🔁 Momentum Flip: {second_last['direction']} ➡ {last['direction']} at ${current_price}"
-            conn.sendall(message.encode('utf-8'))
-            send_telegram_alert(message)
         elif fading:
             message = f"😶 Consolidation Zone Detected: 4 Dojis near ${current_price}"
-            conn.sendall(message.encode('utf-8'))
-            send_telegram_alert(message)
         else:
             print("⏸ Monitoring paused — no reversal condition met.")
+            prev_price = current_price
+            prev_direction = direction
+            prev_candle_size = candle_size
+            continue
+
+        conn.sendall(message.encode('utf-8'))
+        send_telegram_alert(message)
+        log_alert(message)
 
         prev_price = current_price
         prev_direction = direction
@@ -108,9 +115,6 @@ while True:
     # 💥 Active Monitoring Mode
     if candle_size >= 4:
         message = f"⚡ High Volatility! Size: ${candle_size}"
-        conn.sendall(message.encode('utf-8'))
-        send_telegram_alert(message)
-
     elif candle_size >= 2:
         similar_candle = (
             abs(candle_size - prev_candle_size) < 0.5 and
@@ -121,27 +125,31 @@ while True:
             (timestamp - last_sr_break_time < timedelta(minutes=30))
         )
 
-        if similar_candle:
-            print("🚫 Skipped: Similar candle detected.")
-        elif sr_blocked:
-            print("🚫 Skipped: SR break clustering.")
-        else:
-            if current_price > RESISTANCE:
-                message = f"📈 Resistance broken at ${current_price}"
-                conn.sendall(message.encode('utf-8'))
-                send_telegram_alert(message)
-                last_sr_break_time = timestamp
-            elif current_price < SUPPORT:
-                message = f"📉 Support broken at ${current_price}"
-                conn.sendall(message.encode('utf-8'))
-                send_telegram_alert(message)
-                last_sr_break_time = timestamp
-            else:
-                message = f"💥 Momentum candle: ${candle_size}"
-                conn.sendall(message.encode('utf-8'))
-                send_telegram_alert(message)
+        if similar_candle or sr_blocked:
+            print("🚫 Skipped: Similar candle or clustered SR break.")
+            prev_price = current_price
+            prev_direction = direction
+            prev_candle_size = candle_size
+            continue
 
-        prev_candle_size = candle_size
+        if current_price > RESISTANCE:
+            message = f"📈 Resistance broken at ${current_price}"
+            last_sr_break_time = timestamp
+        elif current_price < SUPPORT:
+            message = f"📉 Support broken at ${current_price}"
+            last_sr_break_time = timestamp
+        else:
+            message = f"💥 Momentum candle: ${candle_size}"
+    else:
+        prev_price = current_price
         prev_direction = direction
+        prev_candle_size = candle_size
+        continue
+
+    conn.sendall(message.encode('utf-8'))
+    send_telegram_alert(message)
+    log_alert(message)
 
     prev_price = current_price
+    prev_direction = direction
+    prev_candle_size = candle_size

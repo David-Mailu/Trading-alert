@@ -1,15 +1,12 @@
-# Feed.py
-import requests
 import time
+import requests
 
-API_KEY = "C0VAORS5QVWWPB9W"
+API_KEY = "6f67bf046e494077a8f8d21927a7c5d9"
 
-def get_xauusd_price(max_retries=5, delay_seconds=2):
-    url = "https://www.alphavantage.co/query"
+def get_xauusd_price(max_retries=3, delay_seconds=3):
+    url = "https://api.twelvedata.com/price"
     params = {
-        "function": "CURRENCY_EXCHANGE_RATE",
-        "from_currency": "XAU",
-        "to_currency": "USD",
+        "symbol": "XAU/USD",
         "apikey": API_KEY
     }
 
@@ -19,11 +16,12 @@ def get_xauusd_price(max_retries=5, delay_seconds=2):
             response.raise_for_status()
             data = response.json()
 
-            rate = data["Realtime Currency Exchange Rate"]["5. Exchange Rate"]
-            return float(rate)
-
-        except (requests.RequestException, KeyError, ValueError) as e:
-            print(f"[Retry {attempt}] ⚠️ Error fetching price: {e}")
+            if "price" in data:
+                return float(data["price"])
+            else:
+                raise ValueError(f"No price returned: {data}")
+        except Exception as e:
+            print(f"[Retry {attempt}] ⚠️ TwelveData error: {e}")
             if attempt < max_retries:
                 time.sleep(delay_seconds)
             else:
