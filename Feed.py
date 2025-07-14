@@ -3,10 +3,12 @@ import requests
 
 API_KEY = "6f67bf046e494077a8f8d21927a7c5d9"
 
-def get_xauusd_price(max_retries=3, delay_seconds=3):
-    url = "https://api.twelvedata.com/price"
+def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
+    url = "https://api.twelvedata.com/time_series"
     params = {
         "symbol": "XAU/USD",
+        "interval": "15min",
+        "outputsize": 1,  # Only need the latest candle
         "apikey": API_KEY
     }
 
@@ -16,10 +18,14 @@ def get_xauusd_price(max_retries=3, delay_seconds=3):
             response.raise_for_status()
             data = response.json()
 
-            if "price" in data:
-                return float(data["price"])
+            if "values" in data and len(data["values"]) > 0:
+                candle = data["values"][0]  # Get the latest candle
+                return {
+                    "open": float(candle["open"]),
+                    "close": float(candle["close"])
+                }
             else:
-                raise ValueError(f"No price returned: {data}")
+                raise ValueError(f"No candle data returned: {data}")
         except Exception as e:
             print(f"[Retry {attempt}] ⚠️ TwelveData error: {e}")
             if attempt < max_retries:
