@@ -1,211 +1,333 @@
-import socket
-import time
+import socket, time
 from datetime import datetime, timedelta
+from pytz import timezone
 from Feed import get_xauusd_15min_candles
 from Telegramalert import send_telegram_alert
-from pytz import timezone
 from requests.exceptions import RequestException
 
-# 🕒 Market Schedule
-def markets_open_now():
-    eat = timezone("Africa/Nairobi")
-    now = datetime.now(eat)
-    weekday = now.weekday()
-    hour = now.hour
-    minute = now.minute
+# 🕒 Market Schedule Handler
+class MarketSchedule:
+    def __init__(self, debug=False):
+        self.debug = debug
 
-    if weekday == 5 or weekday == 6:
-        return False
-    elif weekday == 4 and (hour > 23 or (hour == 23 and minute >= 45)):
-        return False
-    elif weekday == 0 and hour < 2:
-        return False
-    return True
+    def is_market_open(self):
+        eat = timezone("Africa/Nairobi")
+        now = datetime.now(eat)
+        print(f"🕒 Market check: {now.strftime('%A %H:%M')}")
+        if self.debug:
+            print("🧪 Debug ON: Skipping market hours check.")
+            return True
 
-# 😴 Maintenance Sleep Window
-def in_sleep_window():
-    eat = timezone("Africa/Nairobi")
-    now = datetime.now(eat)
-    return now.weekday() in range(0, 5) and now.hour == 0
+        wd, hr, min = now.weekday(), now.hour, now.minute
+        return not (
+            wd in [5, 6] or
+            (wd == 4 and (hr > 23 or (hr == 23 and min >= 45))) or
+            (wd == 0 and hr < 2)
+        )
 
-# 📡 Resilient Data Pull
-def resilient_data_pull():
-    retry_schedule = [10, 600, 1800, 3600]
-    for attempt, delay in enumerate(retry_schedule, start=1):
+    def in_maintenance(self):
+        eat = timezone("Africa/Nairobi")
+        return datetime.now(eat).hour == 0
+
+# 📡 Candle Fetcher with Retry Logic
+class CandleFetcher:
+    def pull(self):
+        retry_schedule = [10, 600, 1800, 3600]
+        for i, delay in enumerate(retry_schedule, 1):
+            try:
+                candle = get_xauusd_15min_candles()
+                if candle and "open" in candle and "close" in candle:
+                    return candle
+                print(f"🧭 Incomplete data: {candle}")
+            except RequestException as e:
+                print(f"📡 Network error {i}: {e}")
+            except Exception as e:
+                print(f"⚠️ Unexpected error {i}: {e}")
+            print(f"🕒 Retrying in {delay} sec...")
+            time.sleep(delay)
+        print("📴 Connection failed.")
+        return None
+
+# 📌 Support/Resistance Manager
+class SRManager:
+    def __init__(self):
+        self.support, self.resistance = [], []
+        self.bounces = {"support": [], "resistance": []}
+        self.breaks = {
+            "support": {"doji": 0, "momentum": 0, "high_volatility": 0},
+            "resistance": {"doji": 0, "momentum": 0, "high_volatility": 0}
+        }
+
+    def init_zones(self):
+        print("📌 Enter SR levels (up to 2 each):")
+        for i in range(2):
+            s = input(f"Support {i+1}: ").strip()
+            if s: self.support.append(float(s))
+            r = input(f"Resistance {i+1}: ").strip()
+            if r: self.resistance.append(float(r))
+
+    def update_zone(self, price, direction):
+        zones = self.support if direction == "up" else self.resistance
+        zones[:] = [z for z in zones if abs(z - price) > 5]
+        if len(zones) >= 4: zones.pop(0)
+        zones.append(price)
+
+    def classify(self, size):
+        return "doji" if size < 2 else "momentum" if size <= 5 else "high_volatility"
+
+    def track_break(self, zone_type, candle_type):
+        self.breaks[zone_type][candle_type] += 1
+
+    def nearest_zone(self, price, zone_type):
+        zones = self.support if zone_type == "support" else self.resistance
+        return min(zones, key=lambda z: abs(z - price)) if zones else None
+
+    def record_bounce(self, typ, zone_price, price):
+        if abs(price - zone_price) <= 5:
+            self.bounces[typ].append(price)
+            if len(self.bounces[typ]) > 2: self.bounces[typ].pop(0)
+
+    def report_breaks(self, zone_type):
+        bt = self.breaks[zone_type]
+        total = sum(bt.values())
+        if total:
+            msg = f"🔔 {zone_type.capitalize()} broken by " + ", ".join(f"{v}×{k}" for k,v in bt.items() if v)
+            self.breaks[zone_type] = {k: 0 for k in bt}
+            return msg
+        return None
+
+# 📋 Alert Logger
+class AlertLogger:
+    def __init__(self, conn): self.conn = conn
+
+    def log(self, msg):
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+        full = f"[{ts}] {msg}"
+        print(full)
+        self.conn.sendall(full.encode('utf-8'))
+        send_telegram_alert(full)
+        with open("server_alerts_log.txt", "a", encoding="utf-8") as f:
+            f.write(full + "\n")
+
+# 🧠 Smart Alert Server
+class SmartServer:
+    def __init__(self, debug=False):
+        self.debug = debug
+        self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        self.sock.bind(('::1', 65432))
+        self.sock.listen()
+        print("🧠 Server online (IPv6). Waiting for connection...")
+        self.conn, addr = self.sock.accept()
+        print(f"🔗 Connected to {addr}")
+
+        self.market = MarketSchedule(debug=debug)
+        self.fetcher = CandleFetcher()
+        self.sr = SRManager()
+        self.log = AlertLogger(self.conn)
+        self.reversal = Reversal()
+        self.reversal_buffer = []
+        self.prev_dir = None
+        self.prev_size = None
+        self.last_break = None
+
+    def wait_next_quarter(self):
+        now = datetime.now()
+        minute = ((now.minute // 15 + 1) * 15) % 60
+        hour = (now.hour + (1 if minute == 0 else 0)) % 24
+        next_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        sleep = (next_time - now).total_seconds()
+        print(f"⏳ Next run at {next_time.strftime('%H:%M')} ({int(sleep)}s)")
+        time.sleep(sleep)
+
+    def initialize(self):
+        if not self.market.is_market_open():
+            print("📴 Market closed. Exit.")
+            return False
+        self.sr.init_zones()
+        d = input("📈 Previous direction (up/down): ").strip()
+        self.prev_dir = d if d in ["up", "down"] else None
         try:
-            candle = get_xauusd_15min_candles()
-            if candle and "open" in candle and "close" in candle:
-                return candle
-            else:
-                print(f"🧭 Twelve Data API failed: Incomplete candle data {candle}")
-        except RequestException as e:
-            print(f"📡 Network error attempt {attempt}: {e}")
+            self.prev_size = float(input("💡 Previous candle size: ").strip())
+        except:
+            self.prev_size = None
+        return True
+
+    def start(self):
+        if not self.initialize(): return
+        try:
+            while True:
+                self.wait_next_quarter()
+                if self.market.in_maintenance():
+                    print("😴 Maintenance window (12AM–1AM). Sleeping...")
+                    time.sleep(3600)
+                    continue
+
+                candle = self.fetcher.pull()
+                open_, close = float(candle["open"]), float(candle["close"])
+                size, price = abs(close - open_), close
+                direction = "up" if close > open_ else "down"
+                # 🧠 Add to reversal buffer
+                self.reversal_buffer.append(candle)
+                if len(self.reversal_buffer) > 3:
+                    self.reversal_buffer.pop(0)
+
+                # 🔄 Reversal Logic
+                if len(self.reversal_buffer) == 3:
+                    base, next1, next2 = self.reversal_buffer
+                    msg = self.reversal.is_downward_reversal(base, [next1, next2])
+                    if not msg:
+                        msg = self.reversal.is_upward_reversal(base, [next1, next2])
+                    if not msg:
+                        msg = self.reversal.is_pullback_reversal("up" if base["close"] > base["open"] else "down",
+                                                                 [next1, next2])
+                    if msg:
+                        self.log.log(msg)
+
+                    # ⏸️ Consolidation Check
+                    msg = self.reversal.detect_consolidation(self.reversal_buffer)
+                    if msg:
+                        self.log.log(msg)
+
+                if not candle: continue
+
+                open_, close = float(candle["open"]), float(candle["close"])
+                size, price = abs(close - open_), close
+                direction = "up" if close > open_ else "down"
+
+                self.sr.update_zone(price, direction)
+                for typ in ["support", "resistance"]:
+                    zone = self.sr.nearest_zone(price, typ)
+                    if zone:
+                        self.sr.record_bounce(typ, zone, price)
+                        broken = (price - zone > 5 if typ == "resistance" else zone - price > 5)
+                        if broken:
+                            ctype = self.sr.classify(size)
+                            self.sr.track_break(typ, ctype)
+
+                if all(len(self.sr.bounces[t]) >= 2 for t in ["support", "resistance"]):
+                    msg = f"📊 Consolidation detected between Support ≈ ${self.sr.nearest_zone(price, 'support')} and Resistance ≈ ${self.sr.nearest_zone(price, 'resistance')}"
+                    self.log.log(msg)
+                    self.sr.bounces = {"support": [], "resistance": []}
+
+                for typ in ["support", "resistance"]:
+                    msg = self.sr.report_breaks(typ)
+                    if msg: self.log.log(msg)
+
+                if size > 5:
+                    self.log.log(f"⚡ High Volatility! Size: ${size}")
+                elif 2 <= size <= 5:
+                    similar = self.prev_size and abs(size - self.prev_size) < 0.5 and direction == self.prev_dir
+                    clustered = self.last_break and datetime.now() - self.last_break < timedelta(minutes=30)
+                    if similar or clustered:
+                        print("🚫 Skipped: Similar candle or recent SR break.")
+                        self.prev_dir, self.prev_size = direction, size
+                        continue
+                    zone = self.sr.nearest_zone(price, "resistance")
+                    if zone and price > zone:
+                        msg = f"📈 Resistance broken near ${zone} ➞ ${price}"
+                        self.last_break = datetime.now()
+                        self.log.log(msg)
+                    elif (zone := self.sr.nearest_zone(price, "support")) and price < zone:
+                        msg = f"📉 Support broken near ${zone} ➞ ${price}"
+                        self.last_break = datetime.now()
+                        self.log.log(msg)
+                    else:
+                         msg = f"💥 Momentum candle: ${size}"
+                         self.log.log(msg)
+
+
+                self.prev_dir, self.prev_size = direction, size
+        except KeyboardInterrupt:
+            print("🛑 Server interrupted.")
         except Exception as e:
-            print(f"⚠️ Unexpected error attempt {attempt}: {e}")
+            print(f"💥 Uncaught error: {e}")
+        finally:
+            print("🔌 Closing server...")
+            self.conn.close()
+            self.sock.close()
 
-        print(f"🕒 Retrying in {delay // 60 if delay >= 60 else delay} {'min' if delay >= 60 else 'sec'}...")
-        time.sleep(delay)
 
-    print("📴 Poor internet connection. Program terminated.")
-    return None
+class Reversal:
+    def __init__(self):
+        self.consolidation_count = 0
+        self.last_consolidation = None
 
-# 📌 Manual SR Setup
-support_levels = []
-resistance_levels = []
-MAX_ZONES = 4
-BOUNCE_DISTANCE = 5
-RANGE_THRESHOLD = 2
-bounce_records = {"support": [], "resistance": []}
+    def get_wicks(self, candle):
+        open_, close = float(candle["open"]), float(candle["close"])
+        high, low = float(candle["high"]), float(candle["low"])
 
-def initialize_zones():
-    print("📌 Optional SR Setup — Enter up to 2 support/resistance levels (press Enter to skip):")
-    for i in range(2):
-        s = input(f"Support {i+1}: ").strip()
-        if s:
-            support_levels.append(float(s))
-        r = input(f"Resistance {i+1}: ").strip()
-        if r:
-            resistance_levels.append(float(r))
-
-def update_zones(price, direction, last_direction):
-    zone_list = support_levels if direction == "up" else resistance_levels
-    redundant = [z for z in zone_list if abs(z - price) <= BOUNCE_DISTANCE]
-    if redundant:
-        zone_list.remove(redundant[0])
-    if len(zone_list) >= MAX_ZONES:
-        zone_list.pop(0)
-    zone_list.append(price)
-
-def get_nearest_zone(price, zones):
-    return min(zones, key=lambda z: abs(z - price)) if zones else None
-
-def record_bounce(zone_type, zone_price, price):
-    if abs(price - zone_price) <= BOUNCE_DISTANCE:
-        bounce_records[zone_type].append(price)
-        if len(bounce_records[zone_type]) > RANGE_THRESHOLD:
-            bounce_records[zone_type].pop(0)
-
-def wait_until_next_quarter():
-    now = datetime.now()
-    minute = (now.minute // 15 + 1) * 15
-    if minute == 60:
-        next_time = now.replace(hour=(now.hour + 1) % 24, minute=0, second=0, microsecond=0)
-    else:
-        next_time = now.replace(minute=minute, second=0, microsecond=0)
-    wait_seconds = (next_time - now).total_seconds()
-    print(f"⏳ Waiting until {next_time.strftime('%H:%M')} ({int(wait_seconds)}s)...")
-    time.sleep(wait_seconds)
-
-def log_alert(message):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    formatted = f"[{timestamp}] {message}"
-    print(formatted)
-    with open("server_alerts_log.txt", "a", encoding="utf-8") as log_file:
-        log_file.write(formatted + "\n")
-
-# 🚀 Startup Checks
-if not markets_open_now():
-    print("📴 Markets closed. Program will now exit.")
-    exit()
-
-initialize_zones()
-
-# 🌐 Dual-stack socket setup (IPv6 preferred, fallback handled via client)
-server_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-server_socket.bind(('::1', 65432))
-server_socket.listen()
-print("🧠 Smart server online (IPv6)...")
-
-conn, addr = server_socket.accept()
-print(f"🔗 Connected to {addr}")
-
-prev_direction = None
-prev_candle_size = None
-last_sr_break_time = None
-
-try:
-    while True:
-        wait_until_next_quarter()
-
-        if in_sleep_window():
-            print("😴 Sleeping for maintenance (12AM–1AM EAT)...")
-            time.sleep(3600)
-            continue
-
-        candle = resilient_data_pull()
-        if not candle:
-            continue
-
-        open_price = float(candle["open"])
-        close_price = float(candle["close"])
-        current_price = close_price
-        candle_size = abs(close_price - open_price)
-        direction = "up" if close_price > open_price else "down"
-
-        update_zones(current_price, direction, prev_direction)
-        nearest_support = get_nearest_zone(current_price, support_levels)
-        nearest_resistance = get_nearest_zone(current_price, resistance_levels)
-
-        if nearest_support and current_price > nearest_support:
-            record_bounce("support", nearest_support, current_price)
-        if nearest_resistance and current_price < nearest_resistance:
-            record_bounce("resistance", nearest_resistance, current_price)
-
-        if (
-            len(bounce_records["support"]) >= RANGE_THRESHOLD and
-            len(bounce_records["resistance"]) >= RANGE_THRESHOLD
-        ):
-            message = f"📊 Consolidation Detected between Support ≈ ${nearest_support} and Resistance ≈ ${nearest_resistance}"
-            conn.sendall(message.encode('utf-8'))
-            send_telegram_alert(message)
-            log_alert(message)
-            bounce_records["support"].clear()
-            bounce_records["resistance"].clear()
-            prev_direction = direction
-            continue
-
-        timestamp = datetime.now()
-        if candle_size >= 4:
-            message = f"⚡ High Volatility! Size: ${candle_size}"
-        elif candle_size >= 2:
-            similar_candle = (
-                prev_candle_size and
-                abs(candle_size - prev_candle_size) < 0.5 and
-                direction == prev_direction
-            )
-            sr_blocked = (
-                last_sr_break_time and
-                (timestamp - last_sr_break_time < timedelta(minutes=30))
-            )
-
-            if similar_candle or sr_blocked:
-                print("🚫 Skipped: Similar candle or clustered SR break.")
-                prev_direction = direction
-                prev_candle_size = candle_size
-                continue
-
-            if nearest_resistance and current_price > nearest_resistance:
-                message = f"📈 Resistance broken near ${nearest_resistance} ➞ ${current_price}"
-                last_sr_break_time = timestamp
-            elif nearest_support and current_price < nearest_support:
-                message = f"📉 Support broken near ${nearest_support} ➞ ${current_price}"
-                last_sr_break_time = timestamp
-            else:
-                message = f"💥 Momentum candle: ${candle_size}"
+        if close < open_:
+            upper_wick = high - open_
+            lower_wick = close - low
         else:
-            prev_direction = direction
-            prev_candle_size = candle_size
-            continue
+            upper_wick = high - close
+            lower_wick = low - open_
 
-        conn.sendall(message.encode('utf-8'))
-        send_telegram_alert(message)
-        log_alert(message)
+        return upper_wick, lower_wick
 
-        prev_direction = direction
-        prev_candle_size = candle_size
+    def is_downward_reversal(self, candle, next_two):
+        upper, lower = self.get_wicks(candle)
+        sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
+        directions = [float(c["close"]) < float(c["open"]) for c in next_two]
 
-except KeyboardInterrupt:
-    print("🛑 Smart server closed by user.")
-    conn.close()
-    server_socket.close()
-    exit()
+        if upper >= 1 and lower <= 0.5 and all(directions) and any(s >= 2 for s in sizes):
+            high = float(candle["high"])
+            close_last = float(next_two[-1]["close"])
+            size = round(high - close_last, 2)
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+            return f"🔻 Downward Reversal (wick) at {ts}, size: ${size}"
+        return None
+
+    def is_upward_reversal(self, candle, next_two):
+        upper, lower = self.get_wicks(candle)
+        sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
+        directions = [float(c["close"]) > float(c["open"]) for c in next_two]
+
+        if lower >= 1 and upper <= 0.5 and all(directions) and any(s >= 2 for s in sizes):
+            close_curr = float(next_two[-1]["close"])
+            lows = [float(c["low"]) for c in next_two]
+            size = round(close_curr - min(lows), 2)
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+            return f"🔺 Upward Reversal (wick) at {ts}, size: ${size}"
+        return None
+
+    def is_pullback_reversal(self, initial_direction, next_two):
+        sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
+        directions = [float(c["close"]) < float(c["open"]) for c in next_two] if initial_direction == "up" else \
+                     [float(c["close"]) > float(c["open"]) for c in next_two]
+
+        if all(directions) and any(s >= 2 for s in sizes):
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+            if initial_direction == "up":
+                close_last = float(next_two[-1]["close"])
+                high = max(float(c["high"]) for c in next_two)
+                size = round(high - close_last, 2)
+                return f"🔻 Pullback Reversal (Down) at {ts}, size: ${size}"
+            else:
+                close_last = float(next_two[-1]["close"])
+                low = min(float(c["low"]) for c in next_two)
+                size = round(close_last - low, 2)
+                return f"🔺 Pullback Reversal (Up) at {ts}, size: ${size}"
+        return None
+
+    def detect_consolidation(self, last_three):
+        open_first = float(last_three[0]["open"])
+        close_last = float(last_three[-1]["close"])
+        net_move = abs(close_last - open_first)
+        if net_move < 3:
+            self.consolidation_count += 1
+            if self.consolidation_count <= 4:
+                ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+                return f"⏸️ Consolidation detected at {ts}, range: ${round(net_move, 2)}"
+        else:
+            self.consolidation_count = 0
+        return None
+
+
+
+if __name__ == "__main__":
+    try:
+        server = SmartServer(debug=False)
+        server.start()
+    except Exception as e:
+        print(f"🚨 Fatal error in orchestrator: {e}")

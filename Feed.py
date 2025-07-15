@@ -21,8 +21,13 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
             if "values" in data and len(data["values"]) > 0:
                 candle = data["values"][0]  # Get the latest candle
                 return {
+
                     "open": float(candle["open"]),
-                    "close": float(candle["close"])
+                    "close": float(candle["close"]),
+                    "high": float(candle["high"]),
+                    "low": float(candle["low"])
+
+
                 }
             else:
                 raise ValueError(f"No candle data returned: {data}")
