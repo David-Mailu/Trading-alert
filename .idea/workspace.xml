@@ -4,14 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="added classes reversal reading">
-      <change afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/support.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Trading-alert.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Trading-alert.iml" afterDir="false" />
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="dived some files into modules for easy ACCESS and MAINTENANCE">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Feed.py" beforeDir="false" afterPath="$PROJECT_DIR$/Feed.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test-telegram.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,7 +33,7 @@
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/David-Mailu/Trading-alert.git&quot;,
-    &quot;accountId&quot;: &quot;8f979555-f28c-4b1b-9421-3f1af4db6c0b&quot;
+    &quot;accountId&quot;: &quot;9b47f115-db3e-4a1e-b0f8-b05d29ea01ab&quot;
   }
 }</component>
   <component name="ProjectColorInfo">{
@@ -198,8 +194,33 @@
       <option name="project" value="LOCAL" />
       <updated>1752561271927</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="dived some files into modules for easy ACCESS and MAINTENANCE">
+      <option name="closed" value="true" />
+      <created>1752767256249</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1752767256249</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="CUSTOM_BOOLEAN_PROPERTIES">
+                <map>
+                  <entry key="Show.Git.Branches" value="false" />
+                </map>
+              </option>
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="The beginning of my trading alert system" />
@@ -207,6 +228,18 @@
     <MESSAGE value="tested the program,solving bugs on monday" />
     <MESSAGE value="dual configuration and time proof logic added" />
     <MESSAGE value="added classes reversal reading" />
-    <option name="LAST_COMMIT_MESSAGE" value="added classes reversal reading" />
+    <MESSAGE value="dived some files into modules for easy ACCESS and MAINTENANCE" />
+    <option name="LAST_COMMIT_MESSAGE" value="dived some files into modules for easy ACCESS and MAINTENANCE" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/Logic.py</url>
+          <line>98</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>
