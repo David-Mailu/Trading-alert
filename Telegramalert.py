@@ -1,19 +1,27 @@
-# telegram_alert.py
-import requests
+from bot import alerts_active, sr_config, send_telegram_alert
 
-BOT_TOKEN = "7701018588:AAEjcMhWCAmd-pgYtgSGgXaFUHpJoK8KO6k"
-CHAT_ID = "5904387124"
+def trigger_alert_if_active(candle_data):
+    """
+    Checks system state and sends alert if allowed.
+    Expects candle_data to contain 'open', 'close', and 'timestamp'.
+    """
 
-def send_telegram_alert(message):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown"  # Optional: lets you use *bold* or _italic_
-    }
+    if not alerts_active:
+        print("🔕 Alert skipped: system is paused.")
+        return
 
-    try:
-        response = requests.post(url, data=payload, timeout=10)
-        response.raise_for_status()
-    except Exception as e:
-        print(f"🚫 Telegram alert failed: {e}")
+    open_ = candle_data["open"]
+    close = candle_data["close"]
+    timestamp = candle_data.get("timestamp", "N/A")
+    size = abs(close - open_)
+
+    message = (
+        f"📈 *New Candle Triggered*\n"
+        f"- Time: `{timestamp}`\n"
+        f"- Open: `{open_}`\n"
+        f"- Close: `{close}`\n"
+        f"- Size: `{size}`\n"
+        f"- SR Tolerance: `{sr_config['tolerance']}`"
+    )
+
+    send_telegram_alert(message)

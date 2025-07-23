@@ -1,14 +1,26 @@
-import socket, time
+import socket, time,threading
 from datetime import datetime, timedelta
 from pytz import timezone
+
+import bot
 from Feed import get_xauusd_15min_candles
 from Telegramalert import send_telegram_alert
 from requests.exceptions import RequestException
 from Logic import Reversal, SRManager
 from support import MarketSchedule, CandleFetcher, AlertLogger
+from bot import alerts_active, sr_config, send_telegram_alert, start_bot
 
 # 🧠 Smart Alert Server
 class SmartServer:
+    def reset_state(self):
+        print("🔄 Resetting internal server state...")
+        self.reversal_buffer = []
+        self.prev_dir = None
+        self.prev_size = None
+        self.last_break = None
+        self.sr.breaks = {"support": [], "resistance": []}
+        self.sr.bounces = {"support": [], "resistance": []}
+        print("✅ Server state reset complete.")
     def initialize(self, max_retries=3, delay_seconds=4):
         if not self.market.is_market_open():
             print("📴 Market closed. Exit.")
@@ -66,6 +78,7 @@ class SmartServer:
         time.sleep(sleep)
 
 
+
     def check_sr_breaks(self, candle, price, size, direction):
         for typ in ["support", "resistance"]:
             zone = self.sr.nearest_zone(price, typ)
@@ -81,6 +94,9 @@ class SmartServer:
         try:
             while True:
                 self.wait_next_quarter()
+                # ⏰ Local time-based reset at midnight
+                if datetime.now().hour == 0 and datetime.now().minute == 0:
+                    self.reset_state()
 
                 if self.market.in_maintenance():
                     print("😴 Maintenance window (12AM–1AM). Sleeping...")
@@ -199,7 +215,10 @@ class SmartServer:
 # 🏁 Entrypoint
 if __name__ == "__main__":
     try:
+        threading.Thread(target=start_bot, daemon=True).start()
+
         server = SmartServer(debug=False)
+        bot.server_instance=server
         server.start()
     except Exception as e:
         print(f"🚨 Fatal error in orchestrator: {e}")
