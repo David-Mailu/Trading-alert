@@ -39,7 +39,22 @@ This system is designed to:
 | 🔂 Wick Filtering           | Filters out misleading SR breaks caused by candle wicks.                   |
 | 📊 Consolidation Detection | Flags tight range activity between defined support and resistance.         |
 | 📤 Telegram Integration     | Sends all qualified alerts to Telegram bot in real-time.                    |
+## 📦 Telegram Bot Integration & Control Module
 
+The system now includes a dedicated `bot.py` module for enhanced user interaction via Telegram. It allows for real-time system control through chat commands.
+
+### 🧭 Features Added via `bot.py`
+- `/pause` – Pauses alert dispatch by setting `server_instance.alerts_active = False`.
+- `/resume` – Reactivates alerts by setting `server_instance.alerts_active = True`.
+- `/status` – Returns current system status including alert state, active feed, and last alert time.
+- Telegram bot links directly to `ServerManager`, enabling two-way control and feedback.
+
+### 🛠️ Code Integration Note
+All alert-state checks should now use:
+
+```python
+if not server.alerts_active:
+    print("🔕 Alert skipped: system is paused.")
 ---
 
 ## 📦 Installation & Usage

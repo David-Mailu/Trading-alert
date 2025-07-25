@@ -8,10 +8,29 @@ from Telegramalert import send_telegram_alert
 from requests.exceptions import RequestException
 from Logic import Reversal, SRManager
 from support import MarketSchedule, CandleFetcher, AlertLogger
-from bot import alerts_active, sr_config, send_telegram_alert, start_bot
+from bot import  sr_config, send_telegram_alert, start_bot
 
 # 🧠 Smart Alert Server
 class SmartServer:
+    def pause_alerts(self):
+        self.alerts_active = False
+        send_telegram_alert("🔕 *Alert system paused.*")
+
+    def resume_alerts(self):
+        self.alerts_active = True
+        send_telegram_alert("🔔 *Alert system resumed.*")
+
+    def maybe_send_alert(self, message):
+        if not self.alerts_active:
+            print("🚫 Alert suppressed (system is paused).")
+            return
+        send_telegram_alert(message)
+    def sync_remote_sr(self, sr_config):
+        self.sr.support = sr_config.get("support", [])[:]
+        self.sr.resistance = sr_config.get("resistance", [])[:]
+        self.sr.tolerance = sr_config.get("tolerance", 2.0)
+        print("🔗 Synced SR zones from remote config.")
+
     def reset_state(self):
         print("🔄 Resetting internal server state...")
         self.reversal_buffer = []
@@ -20,6 +39,10 @@ class SmartServer:
         self.last_break = None
         self.sr.breaks = {"support": [], "resistance": []}
         self.sr.bounces = {"support": [], "resistance": []}
+        if sr_config["support"]:
+            sr_config["support"].pop(0)
+        if sr_config["resistance"]:
+            sr_config["resistance"].pop(0)
         print("✅ Server state reset complete.")
     def initialize(self, max_retries=3, delay_seconds=4):
         if not self.market.is_market_open():
@@ -88,6 +111,9 @@ class SmartServer:
                       f"📈 Resistance broken near ${zone} ➞ ${price}"
                 self.log.log(msg)
 
+        if not self.sr.support and not self.sr.resistance:
+              print("⚠️ SR zones missing — syncing from remote config.")
+              self.sync_remote_sr(sr_config)  # or however your config is passed
     def start(self):
         if not self.initialize():
             return

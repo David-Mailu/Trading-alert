@@ -1,13 +1,13 @@
 import requests,time
 from telebot import TeleBot
-server_instance = None  # This will be set externally
+server_instance = None  # Global variable to hold the server instance
+
+ # This will be set externally
 
 # Telegram bot credentials
 BOT_TOKEN = "7701018588:AAEjcMhWCAmd-pgYtgSGgXaFUHpJoK8KO6k"
 CHAT_ID = "5904387124"
 
-# Runtime state
-alerts_active = True
 
 sr_config = {
     "tolerance": 2.0,  # Default tolerance for support/resistance
@@ -17,7 +17,7 @@ sr_config = {
 
 # Initialize bot instance
 bot = TeleBot(BOT_TOKEN)
-
+ # Link the server instance to the bot
 
 def send_telegram_alert(message):
     """
@@ -47,17 +47,17 @@ def handle_reset(msg):
 # 🧭 Command: /pause
 @bot.message_handler(commands=["pause"])
 def handle_pause(msg):
-    global alerts_active
-    alerts_active = False
-    send_telegram_alert("🔕 *Alert system paused.*")
+    if bot.server_instance:
+        bot.server_instance.pause_alerts()
+    else:
+        send_telegram_alert("⚠️ *No ServerManager instance available.*")
 
-# 🧭 Command: /resume
 @bot.message_handler(commands=["resume"])
 def handle_resume(msg):
-    global alerts_active
-    alerts_active = True
-    send_telegram_alert("🔔 *Alert system resumed.*")
-
+    if bot.server_instance:
+        bot.server_instance.resume_alerts()
+    else:
+        send_telegram_alert("⚠️ *No ServerManager instance available.*")
 # 🛠️ Command: /set_sr 0.25
 @bot.message_handler(commands=["set_sr"])
 def handle_set_sr(msg):
@@ -65,8 +65,19 @@ def handle_set_sr(msg):
         value = float(msg.text.split()[1])
         sr_config["tolerance"] = value
         send_telegram_alert(f"⚙️ *SR tolerance* updated to `{value}`")
+        if server_instance:
+            try:
+                server_instance.sync_remote_sr(sr_config)
+                print("✅ SR sync successful")
+                send_telegram_alert("✅ *SR config synced with server successfully.*")
+            except Exception as e:
+                print(f"🚫 Failed to sync SR config: {e}")
+                send_telegram_alert(f"⚠️ *SR sync failed:* `{e}`")
+        else:
+            send_telegram_alert("⚠️ *No server instance available for SR sync.*")
+
     except:
-        send_telegram_alert("⚠️ Usage: `/set_sr 0.25`")
+        send_telegram_alert("⚠️ Usage: `/set_sr 2.5`")
 
 # 📌 Command: /set_support 1920.5
 @bot.message_handler(commands=["set_support"])
@@ -75,6 +86,17 @@ def handle_add_support(msg):
         value = float(msg.text.split()[1])
         sr_config["support"].append(value)
         send_telegram_alert(f"📌 *Support level* added: `{value}`")
+        if server_instance:
+            try:
+                server_instance.sync_remote_sr(sr_config)
+                print("✅ SR sync successful")
+                send_telegram_alert("✅ *SR config synced with server successfully.*")
+            except Exception as e:
+                print(f"🚫 Failed to sync SR config: {e}")
+                send_telegram_alert(f"⚠️ *SR sync failed:* `{e}`")
+        else:
+            send_telegram_alert("⚠️ *No server instance available for SR sync.*")
+
     except:
         send_telegram_alert("⚠️ Usage: `/set_support 1920.5`")
 
@@ -85,19 +107,29 @@ def handle_add_resistance(msg):
         value = float(msg.text.split()[1])
         sr_config["resistance"].append(value)
         send_telegram_alert(f"📍 *Resistance level* added: `{value}`")
+        if server_instance:
+            try:
+                server_instance.sync_remote_sr(sr_config)
+                print("✅ SR sync successful")
+                send_telegram_alert("✅ *SR config synced with server successfully.*")
+            except Exception as e:
+                print(f"🚫 Failed to sync SR config: {e}")
+                send_telegram_alert(f"⚠️ *SR sync failed:* `{e}`")
+        else:
+            send_telegram_alert("⚠️ *No server instance available for SR sync.*")
+
+
     except:
         send_telegram_alert("⚠️ Usage: `/set_resistance 1975.0`")
 
 # 📊 Command: /status
 @bot.message_handler(commands=["status"])
 def handle_status(msg):
-    status = "🟢 active" if alerts_active else "🔴 paused"
-    sr_levels = (
-        f"- Tolerance: `{sr_config['tolerance']}`\n"
-        f"- Support: `{', '.join(map(str, sr_config['support'])) or 'None'}`\n"
-        f"- Resistance: `{', '.join(map(str, sr_config['resistance'])) or 'None'}`"
-    )
-    send_telegram_alert(f"📊 *System Status*\n- Alerts: {status}\n{sr_levels}")
+    if bot.server_instance:
+        status_text = bot.server_instance.get_status_payload()
+        send_telegram_alert(status_text)
+    else:
+        send_telegram_alert("⚠️ *No server instance linked. Cannot fetch status.*")
 def start_bot():
     try:
         bot.polling(none_stop=True, timeout=60)

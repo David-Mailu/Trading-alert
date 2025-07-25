@@ -78,8 +78,27 @@ class Reversal:
 
 
 class SRManager:
+    def get_status_payload(self):
+        status = "🟢 active" if self.alerts_active else "🔴 paused"
+
+        sr_config = self.sr.get_config()
+        tolerance = sr_config["tolerance"]
+
+        support = sr_config["support"]
+        resistance = sr_config["resistance"]
+
+        payload = (
+            f"📊 *System Status*\n"
+            f"- Alerts: {status}\n"
+            f"- Tolerance: `{tolerance}`\n"
+            f"- Support Zones: `{', '.join(map(str, support)) or 'None'}`\n"
+            f"- Resistance Zones: `{', '.join(map(str, resistance)) or 'None'}`"
+        )
+        return payload
     def __init__(self):
         self.support, self.resistance = [], []
+        self.alerts_active = False
+        self.tolerance = 3.0  # Default tolerance for SR breaks
         self.bounces = {"support": [], "resistance": []}
 
         # Track break types (for internal insight, optional)
@@ -118,15 +137,15 @@ class SRManager:
             if len(self.bounces[typ]) > 2:
                 self.bounces[typ].pop(0)
 
-    def is_valid_break(self, candle, zone_type, zone_price, proximity=5.0):
+    def is_valid_break(self, candle, zone_type, zone_price):
         open_, close = float(candle["open"]), float(candle["close"])
         direction = "up" if close > open_ else "down"
         price = close
 
         if zone_type == "support" and direction == "down":
-            return price < zone_price and abs(price - zone_price) <= proximity
+            return price < zone_price and abs(price - zone_price) <= self.tolerance
         elif zone_type == "resistance" and direction == "up":
-            return price > zone_price and abs(price - zone_price) <= proximity
+            return price > zone_price and abs(price - zone_price) <= self.tolerance
         return False
 
     def add_break(self, zone_type, zone_price, candle_size):

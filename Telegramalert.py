@@ -1,4 +1,13 @@
-from bot import alerts_active, sr_config, send_telegram_alert
+from bot import (sr_config, send_telegram_alert, )
+from telebot import TeleBot
+from Server import SmartServer
+
+class SmartBot(TeleBot):
+    def __init__(self, token, server_instance):
+        super().__init__(token)
+        self.server_instance = server_instance
+bot = SmartBot("7701018588:AAEjcMhWCAmd-pgYtgSGgXaFUHpJoK8KO6k", server_instance)
+
 
 def trigger_alert_if_active(candle_data):
     """
@@ -6,7 +15,7 @@ def trigger_alert_if_active(candle_data):
     Expects candle_data to contain 'open', 'close', and 'timestamp'.
     """
 
-    if not alerts_active:
+    if not server_instance.alerts_active:
         print("🔕 Alert skipped: system is paused.")
         return
 
