@@ -47,15 +47,16 @@ def handle_reset(msg):
 # 🧭 Command: /pause
 @bot.message_handler(commands=["pause"])
 def handle_pause(msg):
-    if bot.server_instance:
-        bot.server_instance.pause_alerts()
+    if server_instance:
+        server_instance.pause_alerts()
     else:
         send_telegram_alert("⚠️ *No ServerManager instance available.*")
 
 @bot.message_handler(commands=["resume"])
 def handle_resume(msg):
-    if bot.server_instance:
-        bot.server_instance.resume_alerts()
+    if server_instance:
+        server_instance.resume_alerts()
+        send_telegram_alert(server_instance.get_status_payload())
     else:
         send_telegram_alert("⚠️ *No ServerManager instance available.*")
 # 🛠️ Command: /set_sr 0.25
@@ -98,7 +99,7 @@ def handle_add_support(msg):
             send_telegram_alert("⚠️ *No server instance available for SR sync.*")
 
     except:
-        send_telegram_alert("⚠️ Usage: `/set_support 1920.5`")
+        send_telegram_alert("⚠️ Usage: `/set_support e.g 3337.5`")
 
 # 📌 Command: /set_resistance 1975.0
 @bot.message_handler(commands=["set_resistance"])
@@ -120,21 +121,32 @@ def handle_add_resistance(msg):
 
 
     except:
-        send_telegram_alert("⚠️ Usage: `/set_resistance 1975.0`")
+        send_telegram_alert("⚠️ Usage: `/set_resistance e.g 3375.0`")
 
 # 📊 Command: /status
 @bot.message_handler(commands=["status"])
 def handle_status(msg):
-    if bot.server_instance:
-        status_text = bot.server_instance.get_status_payload()
+    if server_instance:
+        status_text = server_instance.get_status_payload()
         send_telegram_alert(status_text)
     else:
         send_telegram_alert("⚠️ *No server instance linked. Cannot fetch status.*")
 def start_bot():
-    try:
-        bot.polling(none_stop=True, timeout=60)
-    except Exception as e:
-        print(f"💥 Bot polling failed: {e}")
+    retry_delays = [60, 300, 600, 1800]
+    max_attempts = len(retry_delays)
+
+    for attempt, delay in enumerate(retry_delays):
+        try:
+            print(f"🟢 Attempt {attempt + 1}: Starting polling with 60s timeout")
+            bot.polling(none_stop=True, timeout=60)
+            break  # Polling succeeded, exit retry loop
+        except Exception as e:
+            print(f"💥 Polling failed on attempt {attempt + 1}: {e}")
+            if attempt < max_attempts - 1:
+                print(f"⏳ Retrying in {retry_delays[attempt + 1]} seconds...")
+                time.sleep(retry_delays[attempt + 1])
+            else:
+                print("🔴 All attempts exhausted. Bot may need manual restart.")
 """
     Starts the bot’s polling loop.
     Call this from your main script to begin listening for commands.

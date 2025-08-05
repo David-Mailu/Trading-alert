@@ -79,9 +79,13 @@ class Reversal:
 
 class SRManager:
     def get_status_payload(self):
-        status = "🟢 active" if self.alerts_active else "🔴 paused"
+        status = "🟢 active" if self.server.alerts_active else "🔴 paused"
 
-        sr_config = self.sr.get_config()
+        sr_config = {
+            "tolerance": self.tolerance,
+            "support": self.support,
+            "resistance": self.resistance
+        }
         tolerance = sr_config["tolerance"]
 
         support = sr_config["support"]
@@ -95,9 +99,9 @@ class SRManager:
             f"- Resistance Zones: `{', '.join(map(str, resistance)) or 'None'}`"
         )
         return payload
-    def __init__(self):
+    def __init__(self,server):
         self.support, self.resistance = [], []
-        self.alerts_active = False
+        self.server=server
         self.tolerance = 3.0  # Default tolerance for SR breaks
         self.bounces = {"support": [], "resistance": []}
 

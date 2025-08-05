@@ -12,12 +12,17 @@ from bot import  sr_config, send_telegram_alert, start_bot
 
 # 🧠 Smart Alert Server
 class SmartServer:
+    def get_status_payload(self):
+        payload=self.sr.get_status_payload()
+        return payload if payload else "⚠️ *No status data available.*"
+
     def pause_alerts(self):
         self.alerts_active = False
         send_telegram_alert("🔕 *Alert system paused.*")
 
     def resume_alerts(self):
         self.alerts_active = True
+        print("✅ alerts_active =", self.alerts_active)
         send_telegram_alert("🔔 *Alert system resumed.*")
 
     def maybe_send_alert(self, message):
@@ -28,7 +33,7 @@ class SmartServer:
     def sync_remote_sr(self, sr_config):
         self.sr.support = sr_config.get("support", [])[:]
         self.sr.resistance = sr_config.get("resistance", [])[:]
-        self.sr.tolerance = sr_config.get("tolerance", 2.0)
+        self.sr.tolerance = sr_config.get("tolerance", self.sr.tolerance)
         print("🔗 Synced SR zones from remote config.")
 
     def reset_state(self):
@@ -37,6 +42,7 @@ class SmartServer:
         self.prev_dir = None
         self.prev_size = None
         self.last_break = None
+        self.reversal.consolidation_count = 0
         self.sr.breaks = {"support": [], "resistance": []}
         self.sr.bounces = {"support": [], "resistance": []}
         if sr_config["support"]:
@@ -82,8 +88,9 @@ class SmartServer:
         print(f"🔗 Connected to {addr}")
 
         self.market = MarketSchedule(debug=debug)
+        self.alerts_active = False
         self.fetcher = CandleFetcher()
-        self.sr = SRManager()
+        self.sr = SRManager(self)
         self.log = AlertLogger(self.conn)
         self.reversal = Reversal()
         self.reversal_buffer = []

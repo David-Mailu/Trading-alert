@@ -1,12 +1,5 @@
-from bot import (sr_config, send_telegram_alert, )
-from telebot import TeleBot
-from Server import SmartServer
-
-class SmartBot(TeleBot):
-    def __init__(self, token, server_instance):
-        super().__init__(token)
-        self.server_instance = server_instance
-bot = SmartBot("7701018588:AAEjcMhWCAmd-pgYtgSGgXaFUHpJoK8KO6k", server_instance)
+from bot import ( sr_config,send_telegram_alert)
+from bot import server_instance
 
 
 def trigger_alert_if_active(candle_data):

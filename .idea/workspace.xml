@@ -4,10 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="ADDED telegram message handler for remote reset">
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="tried refining logic, fell into server_instance challenge. i will solve on second monday of next month">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Telegramalert.py" beforeDir="false" afterPath="$PROJECT_DIR$/Telegramalert.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/bot.py" afterDir="false" />
@@ -222,7 +221,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753295726200</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="tried refining logic, fell into server_instance challenge. i will solve on second monday of next month">
+      <option name="closed" value="true" />
+      <created>1753457453428</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1753457453428</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -251,14 +258,15 @@
     <MESSAGE value="dived some files into modules for easy ACCESS and MAINTENANCE" />
     <MESSAGE value="added finhub as backup, introduced automatic direction and size detection" />
     <MESSAGE value="ADDED telegram message handler for remote reset" />
-    <option name="LAST_COMMIT_MESSAGE" value="ADDED telegram message handler for remote reset" />
+    <MESSAGE value="tried refining logic, fell into server_instance challenge. i will solve on second monday of next month" />
+    <option name="LAST_COMMIT_MESSAGE" value="tried refining logic, fell into server_instance challenge. i will solve on second monday of next month" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Logic.py</url>
-          <line>117</line>
+          <line>121</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>
