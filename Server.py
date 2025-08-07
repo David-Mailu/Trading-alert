@@ -37,19 +37,24 @@ class SmartServer:
         print("🔗 Synced SR zones from remote config.")
 
     def reset_state(self):
-        print("🔄 Resetting internal server state...")
-        self.reversal_buffer = []
-        self.prev_dir = None
-        self.prev_size = None
-        self.last_break = None
-        self.reversal.consolidation_count = 0
-        self.sr.breaks = {"support": [], "resistance": []}
-        self.sr.bounces = {"support": [], "resistance": []}
-        if sr_config["support"]:
-            sr_config["support"].pop(0)
-        if sr_config["resistance"]:
-            sr_config["resistance"].pop(0)
-        print("✅ Server state reset complete.")
+        print("Executing server reset...")
+        try:
+          print("🔄 Resetting internal server state...")
+          self.reversal_buffer = []
+          self.prev_dir = None
+          self.prev_size = None
+          self.last_break = None
+          self.reversal.consolidation_count = 0
+          self.sr.breaks = {"support": [], "resistance": []}
+          self.sr.bounces = {"support": [], "resistance": []}
+          self.sr.resistance.clear()
+          self.sr.support.clear()
+          self.sr.break_buffer_detailed.clear()
+          print("✅ Server state reset complete.")
+        except Exception as e:
+            print(f"server reset failed: {e}")
+            msg= f"⚠️ *Server reset failed:* `{e}`"
+            send_telegram_alert(msg)
     def initialize(self, max_retries=3, delay_seconds=4):
         if not self.market.is_market_open():
             print("📴 Market closed. Exit.")
@@ -248,10 +253,9 @@ class SmartServer:
 # 🏁 Entrypoint
 if __name__ == "__main__":
     try:
-        threading.Thread(target=start_bot, daemon=True).start()
-
         server = SmartServer(debug=False)
-        bot.server_instance=server
+        bot.server_instance = server
+        threading.Thread(target=start_bot, daemon=True).start()
         server.start()
     except Exception as e:
         print(f"🚨 Fatal error in orchestrator: {e}")
