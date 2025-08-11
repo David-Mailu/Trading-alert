@@ -48,14 +48,14 @@ def handle_reset(msg):
 @bot.message_handler(commands=["pause"])
 def handle_pause(msg):
     if server_instance:
-        server_instance.pause_alerts()
+        server_instance.pause()
     else:
         send_telegram_alert("⚠️ *No ServerManager instance available.*")
 
 @bot.message_handler(commands=["resume"])
 def handle_resume(msg):
     if server_instance:
-        server_instance.resume_alerts()
+        server_instance.resume()
         send_telegram_alert(server_instance.get_status_payload())
     else:
         send_telegram_alert("⚠️ *No ServerManager instance available.*")

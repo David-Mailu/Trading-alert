@@ -16,20 +16,15 @@ class SmartServer:
         payload=self.sr.get_status_payload()
         return payload if payload else "⚠️ *No status data available.*"
 
-    def pause_alerts(self):
-        self.alerts_active = False
+    def pause(self):
+        self.paused = True
+        print("🔕 alerts_active =", self.paused)
         send_telegram_alert("🔕 *Alert system paused.*")
 
-    def resume_alerts(self):
-        self.alerts_active = True
-        print("✅ alerts_active =", self.alerts_active)
+    def resume(self):
+        self.paused=False
+        print("✅ alerts_active =", self.paused)
         send_telegram_alert("🔔 *Alert system resumed.*")
-
-    def maybe_send_alert(self, message):
-        if not self.alerts_active:
-            print("🚫 Alert suppressed (system is paused).")
-            return
-        send_telegram_alert(message)
     def sync_remote_sr(self, sr_config):
         self.sr.support = sr_config.get("support", [])[:]
         self.sr.resistance = sr_config.get("resistance", [])[:]
@@ -47,9 +42,12 @@ class SmartServer:
           self.reversal.consolidation_count = 0
           self.sr.breaks = {"support": [], "resistance": []}
           self.sr.bounces = {"support": [], "resistance": []}
-          self.sr.resistance.clear()
-          self.sr.support.clear()
-          self.sr.break_buffer_detailed.clear()
+          self.sr.resistance= []
+          self.sr.support = []
+          self.sr.break_buffer_detailed={
+                "support": {},  # Format: {zone_price: [size1, size2, ...]}
+                "resistance": {}
+          }
           print("✅ Server state reset complete.")
         except Exception as e:
             print(f"server reset failed: {e}")
@@ -93,7 +91,7 @@ class SmartServer:
         print(f"🔗 Connected to {addr}")
 
         self.market = MarketSchedule(debug=debug)
-        self.alerts_active = False
+        self.paused = False
         self.fetcher = CandleFetcher()
         self.sr = SRManager(self)
         self.log = AlertLogger(self.conn)
@@ -102,6 +100,7 @@ class SmartServer:
         self.prev_dir = None
         self.prev_size = None
         self.last_break = None
+        self.sr_config = sr_config
 
     def wait_next_quarter(self):
         now = datetime.now()
@@ -125,12 +124,17 @@ class SmartServer:
 
         if not self.sr.support and not self.sr.resistance:
               print("⚠️ SR zones missing — syncing from remote config.")
+              time.sleep(60)
               self.sync_remote_sr(sr_config)  # or however your config is passed
     def start(self):
         if not self.initialize():
             return
         try:
             while True:
+                if self.paused:
+                    print("🔕 Server paused. Waiting for resume...")
+                    time.sleep(1)
+                    continue
                 self.wait_next_quarter()
                 # ⏰ Local time-based reset at midnight
                 if datetime.now().hour == 0 and datetime.now().minute == 0:
@@ -188,7 +192,7 @@ class SmartServer:
                         self.sr.record_bounce(typ, zone, price)
 
                 # 📊 Consolidation signal (based on bounces)
-                if all(len(self.sr.bounces[t]) >= 2 for t in ["support", "resistance"]):
+                if all(len(self.sr.bounces[t]) >= 5 for t in ["support", "resistance"]):
                     msg = (
                         f"📊 Consolidation detected between "
                         f"Support ≈ ${self.sr.nearest_zone(price, 'support')} and "
@@ -245,7 +249,11 @@ class SmartServer:
             print("🛑 Server interrupted.")
         except Exception as e:
             print(f"💥 Uncaught error: {e}")
+            send_telegram_alert(f"⚠️ *Server error:* `{e}`")
+            self.log.log(f"⚠️ *Server error:* `{e}`")
+            self.reset_state()
         finally:
+            send_telegram_alert("🔌 *Server shutting down.")
             print("🔌 Closing server...")
             self.conn.close()
             self.sock.close()

@@ -79,7 +79,7 @@ class Reversal:
 
 class SRManager:
     def get_status_payload(self):
-        status = "🟢 active" if self.server.alerts_active else "🔴 paused"
+        status = "🟢 active" if self.server.paused else "🔴 paused"
 
         sr_config = {
             "tolerance": self.tolerance,
