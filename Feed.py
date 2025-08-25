@@ -1,52 +1,50 @@
+import MetaTrader5 as mt5
+from datetime import datetime
 import time
-import requests
-
-TWELVE_API_KEY = "6f67bf046e494077a8f8d21927a7c5d9"
 
 def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
-    url = "https://api.twelvedata.com/time_series"
-    params = {
-        "symbol": "XAU/USD",
-        "interval": "15min",
-        "outputsize": 1,
-        "apikey": TWELVE_API_KEY
-    }
+    symbol = "XAUUSD"
+    timeframe = mt5.TIMEFRAME_M15
 
     for attempt in range(1, max_retries + 1):
-        print(f"📡 Attempt {attempt} ➝ Fetching XAU/USD 15min candle")
+        print(f"🛠️ Attempt {attempt} ➝ Initializing MetaTrader 5")
         try:
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-
-            if "values" in data and len(data["values"]) > 0:
-                candle = data["values"][0]
-                open_ = float(candle["open"])
-                close = float(candle["close"])
-                size = abs(close - open_)
-
-                print(f"🔍 Sanity Check ➝ Open: {open_}, Close: {close}, Size: {size}")
-
-                if size < 0.1:
-                    print("⚠️ Candle too small ➝ retrying...")
-                else:
-                    return {
-                        "open": open_,
-                        "close": close,
-                        "high": float(candle["high"]),
-                        "low": float(candle["low"]),
-                        "timestamp": candle["datetime"]
-                    }
+            if not mt5.initialize():
+                raise RuntimeError(f"MT5 init failed ➝ {mt5.last_error()}")
             else:
-                print(f"⚠️ Invalid response ➝ {data}")
+                print("✅ MetaTrader 5 initialized successfully.")
+            if not mt5.symbol_select(symbol, True):
+                raise RuntimeError(f"Symbol selection failed ➝ {mt5.last_error()}")
+
+            candles = mt5.copy_rates_from_pos(symbol, timeframe,1,1)
+
+            mt5.shutdown()
+
+            if candles is None or len(candles) == 0:
+                raise ValueError("No candle data retrieved.")
+
+            candle = candles[0]
+            open_ = candle['open']
+            close = candle['close']
+            size = (close - open_)
+
+            print(f"🔍 Sanity Check ➝ Open: {open_}, Close: {close}, Size: {size}")
+
+            if abs(size) < 0.01:
+                raise ValueError("Candle too small ➝ retrying...")
+
+            return {
+                "open": open_,
+                "close": close,
+                "high": candle['high'],
+                "low": candle['low'],
+                "timestamp": datetime.fromtimestamp(candle['time']).isoformat()
+            }
 
         except Exception as e:
             print(f"⚠️ Error ➝ {e}")
-
-        if attempt < max_retries:
-            time.sleep(delay_seconds)
+            if attempt < max_retries:
+                time.sleep(delay_seconds)
 
     print("❌ All retries failed — no valid candle retrieved.")
     return None
-
-# Run it

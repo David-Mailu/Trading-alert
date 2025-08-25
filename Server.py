@@ -1,11 +1,7 @@
 import socket, time,threading
 from datetime import datetime, timedelta
-from pytz import timezone
-
 import bot
 from Feed import get_xauusd_15min_candles
-from Telegramalert import send_telegram_alert
-from requests.exceptions import RequestException
 from Logic import Reversal, SRManager
 from support import MarketSchedule, CandleFetcher, AlertLogger
 from bot import  sr_config, send_telegram_alert, start_bot
@@ -29,6 +25,12 @@ class SmartServer:
         self.sr.support = sr_config.get("support", [])[:]
         self.sr.resistance = sr_config.get("resistance", [])[:]
         self.sr.tolerance = sr_config.get("tolerance", self.sr.tolerance)
+        Max_support_zones=4
+        Max_resistance_zones=4
+        while len(self.sr.support) > Max_support_zones:
+            self.sr.support.pop()
+        while len(self.sr.resistance) > Max_resistance_zones:
+            self.sr.resistance.pop()
         print("🔗 Synced SR zones from remote config.")
 
     def reset_state(self):
@@ -58,7 +60,6 @@ class SmartServer:
             print("📴 Market closed. Exit.")
             return False
 
-        self.sr.init_zones()
         print("📥 Auto-fetching last candle for initialization...")
 
         for attempt in range(1, max_retries + 1):
@@ -66,7 +67,7 @@ class SmartServer:
             if candle:
                 open_ = candle["open"]
                 close = candle["close"]
-                size = abs(close - open_)
+                size = (close - open_)
                 direction = "up" if close > open_ else "down"
 
                 self.prev_dir = direction
@@ -74,6 +75,7 @@ class SmartServer:
 
                 print(f"📈 Previous direction: {direction}")
                 print(f"💡 Previous candle size: {size}")
+                self.sr.init_zones()
                 return True
 
             print(f"[Init Retry {attempt}] ❌ No valid candle. Retrying in {delay_seconds}s...")
@@ -101,18 +103,6 @@ class SmartServer:
         self.prev_size = None
         self.last_break = None
         self.sr_config = sr_config
-
-    def wait_next_quarter(self):
-        now = datetime.now()
-        minute = ((now.minute // 15 + 1) * 15) % 60
-        hour = (now.hour + (1 if minute == 0 else 0)) % 24
-        next_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        sleep = (next_time - now).total_seconds()
-        print(f"⏳ Next run at {next_time.strftime('%H:%M')} ({int(sleep)}s)")
-        time.sleep(sleep)
-
-
-
     def check_sr_breaks(self, candle, price, size, direction):
         for typ in ["support", "resistance"]:
             zone = self.sr.nearest_zone(price, typ)
@@ -135,7 +125,7 @@ class SmartServer:
                     print("🔕 Server paused. Waiting for resume...")
                     time.sleep(1)
                     continue
-                self.wait_next_quarter()
+                self.market.wait_next_quarter()
                 # ⏰ Local time-based reset at midnight
                 if datetime.now().hour == 0 and datetime.now().minute == 0:
                     self.reset_state()
@@ -150,7 +140,7 @@ class SmartServer:
                     continue
 
                 open_, close = float(candle["open"]), float(candle["close"])
-                size = abs(close - open_)
+                size = (close - open_)
                 price = close
                 direction = "up" if close > open_ else "down"
 
@@ -172,9 +162,9 @@ class SmartServer:
                     m2 = self.reversal.is_upward_reversal(base, [next1, next2])
                     if m2: msgs.append(m2)
 
-                    m3 = self.reversal.is_pullback_reversal(
+                    m3 = self.reversal.is_pullback_reversal([next1, next2],
                         "up" if base["close"] > base["open"] else "down",
-                        [next1, next2]
+
                     )
                     if m3: msgs.append(m3)
 
@@ -208,7 +198,7 @@ class SmartServer:
                         self.log.log(msg)
 
                 # ⚡ Volatility / Momentum Notifications
-                if size > 5:
+                if abs(size) > 5:
                     msg = f"⚡ High Volatility! Size: ${size}"
                     self.log.log(msg)
                 else:
@@ -253,7 +243,6 @@ class SmartServer:
             self.log.log(f"⚠️ *Server error:* `{e}`")
             self.reset_state()
         finally:
-            send_telegram_alert("🔌 *Server shutting down.")
             print("🔌 Closing server...")
             self.conn.close()
             self.sock.close()

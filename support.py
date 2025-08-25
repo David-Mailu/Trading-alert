@@ -1,11 +1,30 @@
 import time
-from datetime import datetime
+from datetime import datetime,timedelta
 from pytz import timezone
 from Feed import get_xauusd_15min_candles
 from Telegramalert import send_telegram_alert
 from requests.exceptions import RequestException
 # 🕒 Market Schedule Handler
 class MarketSchedule:
+    def wait_next_quarter(self, buffer_seconds=30):
+        """
+        Waits until buffer_seconds after the next quarter-hour mark.
+        Ensures candle is finalized before fetching.
+        """
+        now = datetime.now()
+        minute = ((now.minute // 15 + 1) * 15) % 60
+        hour = (now.hour + (1 if minute == 0 else 0)) % 24
+
+        # Next quarter-hour timestamp
+        next_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+        # Add buffer to ensure candle finalization
+        target_time = next_time + timedelta(seconds=buffer_seconds)
+        sleep = (target_time - now).total_seconds()
+
+        print(f"⏳ Next run at {target_time.strftime('%H:%M:%S')} ({int(sleep)}s)")
+        time.sleep(sleep)
+
     def __init__(self, debug=False):
         self.debug = debug
 

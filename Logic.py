@@ -1,9 +1,11 @@
 from datetime import datetime
-from  Feed import get_xauusd_15min_candles
+from  support import CandleFetcher
 class Reversal:
     def __init__(self):
         self.consolidation_count = 0
         self.last_consolidation = None
+        self.sr=SRManager(self)
+        self.fetcher = CandleFetcher()
 
     def get_wicks(self, candle):
         open_, close = float(candle["open"]), float(candle["close"])
@@ -44,7 +46,7 @@ class Reversal:
             return f"🔺 Upward Reversal (wick) at {ts}, size: ${size}"
         return None
 
-    def is_pullback_reversal(self, initial_direction, next_two):
+    def is_pullback_reversal(self, next_two,initial_direction):
         sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
         directions = [float(c["close"]) < float(c["open"]) for c in next_two] if initial_direction == "up" else \
                      [float(c["close"]) > float(c["open"]) for c in next_two]
@@ -79,7 +81,7 @@ class Reversal:
 
 class SRManager:
     def get_status_payload(self):
-        status = "🟢 active" if self.server.paused else "🔴 paused"
+        status ="🔴 paused" if self.server.paused else "🟢 active"
 
         sr_config = {
             "tolerance": self.tolerance,
@@ -102,9 +104,9 @@ class SRManager:
     def __init__(self,server):
         self.support, self.resistance = [], []
         self.server=server
+        self.fetcher=CandleFetcher()
         self.tolerance = 3.0  # Default tolerance for SR breaks
         self.bounces = {"support": [], "resistance": []}
-
         # Track break types (for internal insight, optional)
         self.breaks = {
             "support": {"doji": 0, "momentum": 0, "high_volatility": 0},
@@ -130,10 +132,6 @@ class SRManager:
 
     def track_break(self, zone_type, candle_type):
         self.breaks[zone_type][candle_type] += 1
-
-    def nearest_zone(self, price, zone_type):
-        zones = self.support if zone_type == "support" else self.resistance
-        return min(zones, key=lambda z: abs(z - price)) if zones else None
 
     def record_bounce(self, typ, zone_price, price):
         if abs(price - zone_price) <= 5:
@@ -167,3 +165,13 @@ class SRManager:
                 messages.append(f"{zone_type.capitalize()} {zone_price} has been broken by ${total}")
                 buffer[zone_price] = []  # Reset buffer for that zone
         return messages
+
+    def nearest_zone(self, price, zone_type):
+        if zone_type == "support":
+            zones = [z for z in self.support if z < price]  # only below
+        else:  # resistance
+            zones = [z for z in self.resistance if z > price]  # only above
+
+        return min(zones, key=lambda z: abs(z - price)) if zones else None
+
+
