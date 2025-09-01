@@ -1,4 +1,7 @@
 from datetime import datetime
+
+from numpy.ma.core import resize
+
 from  support import CandleFetcher
 class Reversal:
     def __init__(self):
@@ -66,16 +69,22 @@ class Reversal:
         return None
 
     def detect_consolidation(self, last_three):
-        open_first = float(last_three[0]["open"])
-        close_last = float(last_three[-1]["close"])
+        open_first = last_three[0].get("open")
+        close_last = last_three[-1].get("close")
+        if not isinstance(open_first,(int,float)) or not isinstance(close_last,(int,float)):
+            print("🚫 Invalid candle data for consolidation check.")
+            return None
         net_move = abs(close_last - open_first)
         if net_move < 1:
             self.consolidation_count += 1
-            if self.consolidation_count >= 6:
+            if self.consolidation_count >=4 and not self.consolidation_triggered:
+                self.consolidation_triggered = True
+                self.consolidation_count=0
                 ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-                return f"⏸️ A breakout detected at {ts}, range: ${round(net_move, 2)}"
+                return f"⏸️ consolidation detected at {ts}, range: ${round(net_move, 2)}"
         else:
             self.consolidation_count = 0
+            self.consolidation_triggered=False
         return None
 
 
@@ -103,8 +112,11 @@ class SRManager:
         return payload
     def __init__(self,server):
         self.support, self.resistance = [], []
+        self.last_color=None
+        self.red_candles, self.green_candles = [], []
         self.server=server
         self.fetcher=CandleFetcher()
+        self.candle_size=[]
         self.tolerance = 3.0  # Default tolerance for SR breaks
         self.bounces = {"support": [], "resistance": []}
         # Track break types (for internal insight, optional)
@@ -128,50 +140,63 @@ class SRManager:
             if r: self.resistance.append(float(r))
 
     def classify(self, size):
-        return "doji" if size < 2 else "momentum" if size <= 5 else "high_volatility"
+        return "doji" if abs(size) < 1 else "momentum" if abs(size) <= 5 else "high_volatility"
 
-    def track_break(self, zone_type, candle_type):
-        self.breaks[zone_type][candle_type] += 1
+    def store_candle(self,size,Max_history=20):
+        self.candle_size.append(size)
+        if len(self.candle_size) > Max_history:
+            self.candle_size.pop(0)
 
-    def record_bounce(self, typ, zone_price, price):
-        if abs(price - zone_price) <= 5:
-            self.bounces[typ].append(price)
-            if len(self.bounces[typ]) > 2:
-                self.bounces[typ].pop(0)
+    def store_consecutive_candle(self, size, color):
+        if color == "green":
+            if self.last_color == "red":
+                self.red_candles=[]
+            self.green_candles.append(size)
 
-    def is_valid_break(self, candle, zone_type, zone_price):
-        open_, close = float(candle["open"]), float(candle["close"])
-        direction = "up" if close > open_ else "down"
-        price = close
+        elif color == "red":
+            if self.last_color =="green":
+                self.red_candles=[]
+            self.red_candles.append(size)
 
-        if zone_type == "support" and direction == "down":
-            return price < zone_price and abs(price - zone_price) <= self.tolerance
-        elif zone_type == "resistance" and direction == "up":
-            return price > zone_price and abs(price - zone_price) <= self.tolerance
-        return False
+        else:
+            print(f"doji: {color} and size {size}")
 
-    def add_break(self, zone_type, zone_price, candle_size):
-        buffer = self.break_buffer_detailed[zone_type]
-        if zone_price not in buffer:
-            buffer[zone_price] = []
-        buffer[zone_price].append(candle_size)
+        self.last_color = color
 
-    def report_strong_breaks(self, zone_type):
-        buffer = self.break_buffer_detailed[zone_type]
-        messages = []
-        for zone_price, sizes in buffer.items():
-            total = round(sum(sizes), 2)
-            if total > 5:
-                messages.append(f"{zone_type.capitalize()} {zone_price} has been broken by ${total}")
-                buffer[zone_price] = []  # Reset buffer for that zone
-        return messages
+    def get_nearest_zone(self, zone_type, price):
+        zones = self.support if zone_type == "support" else self.resistance
+        if not zones:
+            print("🚫 No zones defined.")
+            return None
+        nearest = min(zones, key=lambda z: abs(z - price))
+        return nearest
 
-    def nearest_zone(self, price, zone_type):
-        if zone_type == "support":
-            zones = [z for z in self.support if z < price]  # only below
-        else:  # resistance
-            zones = [z for z in self.resistance if z > price]  # only above
+    def check_break(self, price, size, direction,):
+        if direction == "down":
+            zone_type = "support"
+        elif direction == "up":
+            zone_type = "resistance"
+        else:
+            print("🚫 Invalid direction for SR check.")
+            return None
 
-        return min(zones, key=lambda z: abs(z - price)) if zones else None
+        zone_price = self.get_nearest_zone(zone_type, price)
+        if zone_price is None:
+            print("🚫 No nearest zone found.")
+            return None
 
+        effective_size = abs(size) if zone_type == "support" else size
 
+        broken = (
+            price < zone_price - self.tolerance if zone_type == "support"
+            else price > zone_price + self.tolerance
+        )
+
+        if broken and effective_size > 2:
+            category = self.classify(effective_size)
+            self.breaks[zone_type][category] += 1
+            self.break_buffer_detailed[zone_type].setdefault(zone_price, []).append(effective_size)
+            msg=f"🚨 {zone_type.capitalize()}{zone_price} Broken! by Price: {price},  Size: ${round(effective_size,2)}, Type: {category}"
+            return msg
+        elif not broken:
+            return None

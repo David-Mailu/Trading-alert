@@ -6,7 +6,7 @@ from Telegramalert import send_telegram_alert
 from requests.exceptions import RequestException
 # 🕒 Market Schedule Handler
 class MarketSchedule:
-    def wait_next_quarter(self, buffer_seconds=30):
+    def wait_next_quarter(self, buffer_seconds=1):
         """
         Waits until buffer_seconds after the next quarter-hour mark.
         Ensures candle is finalized before fetching.

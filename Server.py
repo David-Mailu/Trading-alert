@@ -102,20 +102,9 @@ class SmartServer:
         self.prev_dir = None
         self.prev_size = None
         self.last_break = None
+        self.last_color = None
         self.sr_config = sr_config
-    def check_sr_breaks(self, candle, price, size, direction):
-        for typ in ["support", "resistance"]:
-            zone = self.sr.nearest_zone(price, typ)
-            if zone and self.sr.is_valid_break(candle, typ, zone):
-                self.sr.add_break(typ, zone, size)
-                msg = f"📉 Support broken near ${zone} ➞ ${price}" if typ == "support" else \
-                      f"📈 Resistance broken near ${zone} ➞ ${price}"
-                self.log.log(msg)
 
-        if not self.sr.support and not self.sr.resistance:
-              print("⚠️ SR zones missing — syncing from remote config.")
-              time.sleep(60)
-              self.sync_remote_sr(sr_config)  # or however your config is passed
     def start(self):
         if not self.initialize():
             return
@@ -143,9 +132,7 @@ class SmartServer:
                 size = (close - open_)
                 price = close
                 direction = "up" if close > open_ else "down"
-
-                # ✅ Early SR break check
-                self.check_sr_breaks(candle, price, size, direction)
+                color= "white" if direction is None else "green" if direction=="up" else "red"
 
                 # 🧠 Reversal logic
                 self.reversal_buffer.append(candle)
@@ -175,35 +162,14 @@ class SmartServer:
                     if msg:
                         self.log.log(msg)
 
-                # 🛡️ SR Zone Interaction
-                for typ in ["support", "resistance"]:
-                    zone = self.sr.nearest_zone(price, typ)
-                    if zone:
-                        self.sr.record_bounce(typ, zone, price)
-
-                # 📊 Consolidation signal (based on bounces)
-                if all(len(self.sr.bounces[t]) >= 5 for t in ["support", "resistance"]):
-                    msg = (
-                        f"📊 Consolidation detected between "
-                        f"Support ≈ ${self.sr.nearest_zone(price, 'support')} and "
-                        f"Resistance ≈ ${self.sr.nearest_zone(price, 'resistance')}"
-                    )
-                    self.log.log(msg)
-                    self.sr.bounces = {"support": [], "resistance": []}
-
-                # 🔔 SR break report if combined size > 5
-                for typ in ["support", "resistance"]:
-                    messages = self.sr.report_strong_breaks(typ)
-                    for msg in messages:
-                        self.log.log(msg)
-
+                self.sr.check_break(price, size, direction)
                 # ⚡ Volatility / Momentum Notifications
-                if abs(size) > 5:
-                    msg = f"⚡ High Volatility! Size: ${size}"
+                if (abs(self.prev_size)+abs(size)) > 10 and direction == self.prev_dir:
+                    msg = f"⚡ High Volatility! Size: ${self.prev_size+size}"
                     self.log.log(msg)
                 else:
                     similar = (
-                        self.prev_size and abs(size - self.prev_size) < 0.5
+                        self.prev_size and abs(abs(size) - abs(self.prev_size)) < 0.5
                         and direction == self.prev_dir
                     )
                     clustered = (
@@ -212,28 +178,12 @@ class SmartServer:
 
                     if similar or clustered:
                         print("🚫 Skipping volatility alert due to similar candle or recent SR break.")
-                    else:
-                        zone_r = self.sr.nearest_zone(price, "resistance")
-                        zone_s = self.sr.nearest_zone(price, "support")
 
-                        if zone_r and price > zone_r:
-                            msg = f"📈 Resistance broken near ${zone_r} ➞ ${price}"
-                            self.last_break = datetime.now()
-                            self.log.log(msg)
+                self.sr.check_break(price, size, direction)
 
-                        elif zone_s and price < zone_s:
-                            msg = f"📉 Support broken near ${zone_s} ➞ ${price}"
-                            self.last_break = datetime.now()
-                            self.log.log(msg)
-
-                        else:
-                           continue
-
-                # ✅ Second/failsafe SR break check
-                self.check_sr_breaks(candle, price, size, direction)
 
                 # Update previous cycle state
-                self.prev_dir, self.prev_size = direction, size
+                self.prev_dir, self.prev_size,self.last_color = direction, size, color
 
         except KeyboardInterrupt:
             print("🛑 Server interrupted.")
