@@ -25,9 +25,10 @@ def send_telegram_alert(message):
     This is also used for system messages and command feedback.
     """
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    safe_message = escape_markdown(message)
     payload = {
         "chat_id": CHAT_ID,
-        "text": message,
+        "text": safe_message,
         "parse_mode": "Markdown"
     }
 
@@ -164,3 +165,7 @@ def send_with_retries(url, payload, max_attempts=3, delay=5):
                 time.sleep(delay)
             else:
                 print("❌ All retry attempts failed.")
+def escape_markdown(text):
+    for ch in ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']:
+        text = text.replace(ch, f"\\{ch}")
+    return text

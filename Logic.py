@@ -1,14 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from numpy.ma.core import resize
 
-from  support import CandleFetcher
+from  support import AlertLogger
 class Reversal:
     def __init__(self):
         self.consolidation_count = 0
         self.last_consolidation = None
-        self.sr=SRManager(self)
-        self.fetcher = CandleFetcher()
+        self.consolidation_triggered=False
 
     def get_wicks(self, candle):
         open_, close = float(candle["open"]), float(candle["close"])
@@ -17,14 +16,21 @@ class Reversal:
         if close < open_:
             upper_wick = high - open_
             lower_wick = close - low
-        else:
+        elif close > open_:
             upper_wick = high - close
             lower_wick = low - open_
+        else:
+            print("neutral candle - no wicks")
+            return 0, 0
 
+        print(f"upper_wick: {upper_wick}, lower_wick: {lower_wick}")
         return upper_wick, lower_wick
 
     def is_downward_reversal(self, candle, next_two):
         upper, lower = self.get_wicks(candle)
+        if upper and lower is None:
+            print("🚫 Invalid candle data for downward reversal check.")
+            return None
         sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
         directions = [float(c["close"]) < float(c["open"]) for c in next_two]
 
@@ -38,6 +44,9 @@ class Reversal:
 
     def is_upward_reversal(self, candle, next_two):
         upper, lower = self.get_wicks(candle)
+        if upper and lower is None:
+            print("🚫 Invalid candle data for upward reversal check.")
+            return None
         sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
         directions = [float(c["close"]) > float(c["open"]) for c in next_two]
 
@@ -77,9 +86,8 @@ class Reversal:
         net_move = abs(close_last - open_first)
         if net_move < 1:
             self.consolidation_count += 1
-            if self.consolidation_count >=4 and not self.consolidation_triggered:
+            if self.consolidation_count >=3 and not self.consolidation_triggered:
                 self.consolidation_triggered = True
-                self.consolidation_count=0
                 ts = datetime.now().strftime("%Y-%m-%d %H:%M")
                 return f"⏸️ consolidation detected at {ts}, range: ${round(net_move, 2)}"
         else:
@@ -89,6 +97,75 @@ class Reversal:
 
 
 class SRManager:
+    def start_logic(self,candle):
+        try:
+            open_, close = float(candle["open"]), float(candle["close"])
+            size = (close - open_)
+            price = close
+            direction = "up" if close > open_ else "down"
+            color = "white" if direction is None else "green" if direction == "up" else "red"
+            # 🧠 Reversal logic
+            if direction =="up":
+                self.green_candles.append(size)
+            elif direction =="down":
+                self.red_candles.append(size)
+            else:
+                print(f"doji: {color} and size {size}")
+                return None
+            self.store_candle(size)
+            self.reversal_buffer.append(candle)
+            if len(self.reversal_buffer) > 3:
+                self.reversal_buffer.pop(0)
+
+            if len(self.reversal_buffer) == 3:
+                base, next1, next2 = self.reversal_buffer
+                msgs = []
+
+                m1 = self.reversal.is_downward_reversal(base, [next1, next2])
+                if m1: msgs.append(m1)
+
+                m2 = self.reversal.is_upward_reversal(base, [next1, next2])
+                if m2: msgs.append(m2)
+
+                m3 = self.reversal.is_pullback_reversal([next1, next2],
+                     "up" if base["close"] > base["open"] else "down" )
+                if m3: msgs.append(m3)
+
+                for msg in msgs:
+                    self.log.log(msg)
+
+                msg = self.reversal.detect_consolidation(self.reversal_buffer)
+                if msg:
+                    self.log.log(msg)
+
+            msg = self.check_break(price, size, direction)
+            if msg:
+                self.log.log(msg)
+            self.promote_zone(price,size,direction)
+            # ⚡ Volatility / Momentum Notifications
+            if (abs(self.prev_size) + abs(size)) > 10 and direction == self.prev_dir:
+                msg = f"⚡ High Volatility! Size: ${self.prev_size + size}"
+                self.log.log(msg)
+            else:
+                similar = (
+                        self.prev_size and abs(abs(size) - abs(self.prev_size)) < 0.5
+                        and direction == self.prev_dir
+                )
+                clustered = (
+                        self.last_break and datetime.now() - self.last_break < timedelta(minutes=30)
+                )
+
+                if similar or clustered:
+                    print("🚫 Skipping volatility alert due to similar candle or recent SR break.")
+
+            # Update previous cycle state
+            self.prev_dir, self.prev_size, self.last_color = direction, size, color
+        except Exception as e:
+          print(f"💥 Uncaught error in logic: {e}")
+          self.log.log(f"⚠️ *logic error:* `{e}`")
+        finally:
+            print("🔌server might close...")
+
     def get_status_payload(self):
         status ="🔴 paused" if self.server.paused else "🟢 active"
 
@@ -115,8 +192,13 @@ class SRManager:
         self.last_color=None
         self.red_candles, self.green_candles = [], []
         self.server=server
-        self.fetcher=CandleFetcher()
+        self.log = AlertLogger(server.conn)
+        self.reversal=Reversal()
+        self.reversal_buffer = []
+        self.prev_dir, self.prev_size = None, 0
+        self.last_break = None
         self.candle_size=[]
+        self.threshold = 6 # Threshold for promoting zones
         self.tolerance = 3.0  # Default tolerance for SR breaks
         self.bounces = {"support": [], "resistance": []}
         # Track break types (for internal insight, optional)
@@ -196,7 +278,32 @@ class SRManager:
             category = self.classify(effective_size)
             self.breaks[zone_type][category] += 1
             self.break_buffer_detailed[zone_type].setdefault(zone_price, []).append(effective_size)
-            msg=f"🚨 {zone_type.capitalize()}{zone_price} Broken! by Price: {price},  Size: ${round(effective_size,2)}, Type: {category}"
-            return msg
+            return f"🚨 {zone_type.capitalize()} break at {zone_price} Broken! by Price: {price},  Size: ${round(effective_size,2)}, Type: {category}"
+
         elif not broken:
+            print("no break detected")
             return None
+
+    def promote_zone(self,current_price,size,direction ):
+        price=current_price
+        zone_type = self.check_break(price, size, direction)
+        zone_price = self.support if zone_type == "support" else self.resistance
+        if not zone_price:
+            print("🚫 No zones found.")
+            return None
+
+        # Ensure zone_price is iterable
+        prices = zone_price if isinstance(zone_price, list) else [zone_price]
+
+        for price in prices:
+            if zone_type == 'resistance' and current_price >= price + self.threshold:
+                if price not in self.support:
+                    self.support.append(price)
+                if price in self.resistance:
+                    self.resistance.remove(price)
+
+            elif zone_type == 'support' and current_price <= price - self.threshold:
+                if price not in self.resistance:
+                    self.resistance.append(price)
+                if price in self.support:
+                    self.support.remove(price)

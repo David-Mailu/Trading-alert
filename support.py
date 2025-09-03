@@ -2,7 +2,7 @@ import time
 from datetime import datetime,timedelta
 from pytz import timezone
 from Feed import get_xauusd_15min_candles
-from Telegramalert import send_telegram_alert
+from bot import send_telegram_alert
 from requests.exceptions import RequestException
 # 🕒 Market Schedule Handler
 class MarketSchedule:
