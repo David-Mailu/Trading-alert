@@ -22,8 +22,6 @@ class Reversal:
         else:
             print("neutral candle - no wicks")
             return 0, 0
-
-        print(f"upper_wick: {upper_wick}, lower_wick: {lower_wick}")
         return upper_wick, lower_wick
 
     def is_downward_reversal(self, candle, next_two):
@@ -58,14 +56,14 @@ class Reversal:
             return f"🔺 Upward Reversal (wick) at {ts}, size: ${size}"
         return None
 
-    def is_pullback_reversal(self, next_two,initial_direction):
+    def is_pullback_reversal(self, next_two,base_direction):
         sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
-        directions = [float(c["close"]) < float(c["open"]) for c in next_two] if initial_direction == "up" else \
+        directions = [float(c["close"]) < float(c["open"]) for c in next_two] if base_direction == "up" else \
                      [float(c["close"]) > float(c["open"]) for c in next_two]
 
         if all(directions) and any(s >= 2 for s in sizes):
             ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-            if initial_direction == "up":
+            if base_direction == "up":
                 close_last = float(next_two[-1]["close"])
                 high = max(float(c["high"]) for c in next_two)
                 size = round(high - close_last, 2)
@@ -141,7 +139,7 @@ class SRManager:
             msg = self.check_break(price, size, direction)
             if msg:
                 self.log.log(msg)
-            self.promote_zone(price,size,direction)
+            self.promote_zone(price,direction)
             # ⚡ Volatility / Momentum Notifications
             if (abs(self.prev_size) + abs(size)) > 10 and direction == self.prev_dir:
                 msg = f"⚡ High Volatility! Size: ${self.prev_size + size}"
@@ -163,11 +161,10 @@ class SRManager:
         except Exception as e:
           print(f"💥 Uncaught error in logic: {e}")
           self.log.log(f"⚠️ *logic error:* `{e}`")
-        finally:
-            print("🔌server might close...")
+
 
     def get_status_payload(self):
-        status ="🔴 paused" if self.server.paused else "🟢 active"
+        status ="🟢 active" if self.server.paused==False else "🔴 paused"
 
         sr_config = {
             "tolerance": self.tolerance,
@@ -284,25 +281,27 @@ class SRManager:
             print("no break detected")
             return None
 
-    def promote_zone(self,current_price,size,direction ):
-        price=current_price
-        zone_type = self.check_break(price, size, direction)
-        zone_price = self.support if zone_type == "support" else self.resistance
-        if not zone_price:
+    def promote_zone(self,current_price,direction,threshold=6):
+        if direction == "up":
+            zone_type = "resistance"
+        elif direction == "down":
+            zone_type = "support"
+        else:
+            print("🚫 Invalid direction for zone promotion.")
+            return None
+        zone_list= self.support if zone_type == "support" else self.resistance
+        if not zone_list:
             print("🚫 No zones found.")
             return None
 
-        # Ensure zone_price is iterable
-        prices = zone_price if isinstance(zone_price, list) else [zone_price]
-
-        for price in prices:
-            if zone_type == 'resistance' and current_price >= price + self.threshold:
+        for price in zone_list:
+            if zone_type == 'resistance' and current_price >= price + threshold:
                 if price not in self.support:
                     self.support.append(price)
                 if price in self.resistance:
                     self.resistance.remove(price)
 
-            elif zone_type == 'support' and current_price <= price - self.threshold:
+            elif zone_type == 'support' and current_price <= price - threshold:
                 if price not in self.resistance:
                     self.resistance.append(price)
                 if price in self.support:

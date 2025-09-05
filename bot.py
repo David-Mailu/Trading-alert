@@ -10,7 +10,7 @@ CHAT_ID = "5904387124"
 
 
 sr_config = {
-    "tolerance": 2.0,  # Default tolerance for support/resistance
+    "tolerance": [],  # Default tolerance for support/resistance
     "support": [],
     "resistance": []
 }
@@ -37,7 +37,7 @@ def send_telegram_alert(message):
         response.raise_for_status()
     except Exception as e:
         print(f"🚫 Telegram alert failed: {e}")
-@bot.message_handler(commands=["reset_server"])
+@bot.message_handler(commands=["reset server"])
 def handle_reset(msg):
     if server_instance:
         server_instance.reset_state()
@@ -50,6 +50,7 @@ def handle_reset(msg):
 def handle_pause(msg):
     if server_instance:
         server_instance.pause()
+        send_telegram_alert(server_instance.get_status_payload())
     else:
         send_telegram_alert("⚠️ *No ServerManager instance available.*")
 

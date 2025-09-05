@@ -13,23 +13,21 @@ class SmartServer:
         return payload if payload else "⚠️ *No status data available.*"
 
     def pause(self):
-        self.paused = False
+        self.paused = True
         print("🔕 alerts_active =", self.paused)
         send_telegram_alert("🔕 *Alert system paused.*")
 
     def resume(self):
-        self.paused=True
+        self.paused= False
         print("✅ alerts_active =", self.paused)
         send_telegram_alert("🔔 *Alert system resumed.*")
-    def sync_remote_sr(self, sr_config):
-        self.sr.support = sr_config.get("support", [])[:]
-        self.sr.resistance = sr_config.get("resistance", [])[:]
-        self.sr.tolerance = sr_config.get("tolerance", self.sr.tolerance)
-        Max_support_zones=4
-        Max_resistance_zones=4
-        while len(self.sr.support) > Max_support_zones:
+    def sync_remote_sr(self,max_zones=5):
+        self.sr.support = self.sr_config.get("support", [])[:]
+        self.sr.resistance = self.sr_config.get("resistance", [])[:]
+        self.sr.tolerance = self.sr_config.get("tolerance", self.sr.tolerance)
+        while len(self.sr.support) > max_zones:
             self.sr.support.pop()
-        while len(self.sr.resistance) > Max_resistance_zones:
+        while len(self.sr.resistance) > max_zones:
             self.sr.resistance.pop()
         print("🔗 Synced SR zones from remote config.")
 
@@ -46,6 +44,13 @@ class SmartServer:
           self.sr.bounces = {"support": [], "resistance": []}
           self.sr.resistance= []
           self.sr.support = []
+          self.sr.red_candles = []
+          self.sr.green_candles = []
+          self.sr.candle_size = []
+          self.sr.last_candle = None
+          self.sr_config["support"] = []
+          self.sr_config["resistance"] = []
+          self.sr_config["tolerance"] = 2
           self.sr.break_buffer_detailed={
                 "support": {},  # Format: {zone_price: [size1, size2, ...]}
                 "resistance": {}
