@@ -4,13 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="depopularized server to have logic loops run in logic module . server just dispatches data to logic">
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="added zone promotion based on breaks by set threshold, next will be adding bearish and bullish engulfing reversal logic and zone addition based on reversals">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Telegramalert.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/bot.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/support.py" beforeDir="false" afterPath="$PROJECT_DIR$/support.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -72,7 +68,7 @@
     &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
   }
 }</component>
-  <component name="RunManager" selected="Python.Client">
+  <component name="RunManager" selected="Python.Server">
     <configuration name="Client" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Trading-alert" />
       <option name="ENV_FILES" value="" />
@@ -141,8 +137,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.Client" />
         <item itemvalue="Python.Server" />
+        <item itemvalue="Python.Client" />
         <item itemvalue="Python.request" />
       </list>
     </recent_temporary>
@@ -282,7 +278,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756905323038</updated>
     </task>
-    <option name="localTasksCounter" value="16" />
+    <task id="LOCAL-00016" summary="added zone promotion based on breaks by set threshold, next will be adding bearish and bullish engulfing reversal logic and zone addition based on reversals">
+      <option name="closed" value="true" />
+      <created>1757060100094</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1757060100094</updated>
+    </task>
+    <option name="localTasksCounter" value="17" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -318,14 +322,15 @@
     <MESSAGE value="created an API  that fetches data from mt5 under demo account from IC Markets" />
     <MESSAGE value="scrapped logic to re design again" />
     <MESSAGE value="depopularized server to have logic loops run in logic module . server just dispatches data to logic" />
-    <option name="LAST_COMMIT_MESSAGE" value="depopularized server to have logic loops run in logic module . server just dispatches data to logic" />
+    <MESSAGE value="added zone promotion based on breaks by set threshold, next will be adding bearish and bullish engulfing reversal logic and zone addition based on reversals" />
+    <option name="LAST_COMMIT_MESSAGE" value="added zone promotion based on breaks by set threshold, next will be adding bearish and bullish engulfing reversal logic and zone addition based on reversals" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Logic.py</url>
-          <line>214</line>
+          <line>217</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

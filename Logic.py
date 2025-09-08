@@ -1,3 +1,4 @@
+from collections import deque
 from datetime import datetime, timedelta
 
 from numpy.ma.core import resize
@@ -128,6 +129,8 @@ class SRManager:
                 m3 = self.reversal.is_pullback_reversal([next1, next2],
                      "up" if base["close"] > base["open"] else "down" )
                 if m3: msgs.append(m3)
+                self.add_zone(base, [next1, next2],
+                     "up" if base["close"] > base["open"] else "down", direction)
 
                 for msg in msgs:
                     self.log.log(msg)
@@ -185,17 +188,17 @@ class SRManager:
         )
         return payload
     def __init__(self,server):
-        self.support, self.resistance = [], []
+        self.support=deque(maxlen=10)
+        self.resistance=deque(maxlen=10)
         self.last_color=None
         self.red_candles, self.green_candles = [], []
         self.server=server
         self.log = AlertLogger(server.conn)
         self.reversal=Reversal()
         self.reversal_buffer = []
-        self.prev_dir, self.prev_size = None, 0
+        self.prev_dir, self.prev_size = None, 0.0
         self.last_break = None
         self.candle_size=[]
-        self.threshold = 6 # Threshold for promoting zones
         self.tolerance = 3.0  # Default tolerance for SR breaks
         self.bounces = {"support": [], "resistance": []}
         # Track break types (for internal insight, optional)
@@ -306,3 +309,29 @@ class SRManager:
                     self.resistance.append(price)
                 if price in self.support:
                     self.support.remove(price)
+
+    def add_zone(self, base, next_two, base_direction, direction):
+        new_zone = float(base["high"]) if direction == "down" else float(base["low"])
+        if self.reversal.is_upward_reversal(base, next_two) and direction == "up":
+            if new_zone not in self.support:
+                self.support.append(new_zone)
+            if new_zone in self.resistance:
+                self.resistance.remove(new_zone)
+        elif self.reversal.is_downward_reversal(base, next_two) and direction == "down":
+            if new_zone not in self.resistance:
+                self.resistance.append(new_zone)
+            if new_zone in self.support:
+                self.support.remove(new_zone)
+        elif self.reversal.is_pullback_reversal(next_two, base_direction) and direction in ["up", "down"]:
+            if direction == "up":
+                if new_zone not in self.support:
+                    self.support.append(new_zone)
+                if new_zone in self.resistance:
+                    self.resistance.remove(new_zone)
+            else:
+                if new_zone not in self.resistance:
+                    self.resistance.append(new_zone)
+                if new_zone in self.support:
+                    self.support.remove(new_zone)
+        else:
+            return None
