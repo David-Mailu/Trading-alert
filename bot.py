@@ -37,7 +37,7 @@ def send_telegram_alert(message):
         response.raise_for_status()
     except Exception as e:
         print(f"🚫 Telegram alert failed: {e}")
-@bot.message_handler(commands=["reset server"])
+@bot.message_handler(commands=["reset_server"])
 def handle_reset(msg):
     if server_instance:
         server_instance.reset_state()

@@ -142,6 +142,7 @@ class SRManager:
             msg = self.check_break(price, size, direction)
             if msg:
                 self.log.log(msg)
+            self.depopularize()
             self.promote_zone(price,direction)
             # ⚡ Volatility / Momentum Notifications
             if (abs(self.prev_size) + abs(size)) > 10 and direction == self.prev_dir:
@@ -188,8 +189,8 @@ class SRManager:
         )
         return payload
     def __init__(self,server):
-        self.support=deque(maxlen=10)
-        self.resistance=deque(maxlen=10)
+        self.support=[]
+        self.resistance=[]
         self.last_color=None
         self.red_candles, self.green_candles = [], []
         self.server=server
@@ -335,3 +336,15 @@ class SRManager:
                     self.support.remove(new_zone)
         else:
             return None
+
+    def depopularize(self, threshold=2.0):
+        def filter_oldest(zones):
+            kept = []
+            for price, zone in enumerate(zones):
+                # Check if val is close to any previously kept value
+                if all(abs(zone - prev) > threshold for prev in kept):
+                    kept.append(zone)
+            return kept
+
+        self.support = filter_oldest(self.support)
+        self.resistance = filter_oldest(self.resistance)
