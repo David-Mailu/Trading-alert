@@ -21,40 +21,39 @@ class SmartServer:
         self.paused= False
         print("✅ alerts_active =", self.paused)
         send_telegram_alert("🔔 *Alert system resumed.*")
-    def sync_remote_sr(self,max_zones=5):
-        self.sr.support = self.sr_config.get("support", [])[:]
-        self.sr.resistance = self.sr_config.get("resistance", [])[:]
-        self.sr.tolerance = self.sr_config.get("tolerance", self.sr.tolerance)
+
+    def sync_remote_sr(self, sr_config,max_zones=5):
+        self.sr.support = sr_config.get("support", [])[:]
+        self.sr.resistance = sr_config.get("resistance", [])[:]
+        self.sr.tolerance = sr_config.get("tolerance", self.sr.tolerance)
         while len(self.sr.support) > max_zones:
-            self.sr.support.pop()
+            self.sr.support.pop(0)
         while len(self.sr.resistance) > max_zones:
-            self.sr.resistance.pop()
+            self.sr.resistance.pop(0)
         print("🔗 Synced SR zones from remote config.")
 
-    def reset_state(self):
+    def reset_state(self,sr_config):
         print("Executing server reset...")
         try:
           print("🔄 Resetting internal server state...")
           self.sr.reversal_buffer = []
           self.sr.prev_dir = None
-          self.sr.prev_size = None
+          self.sr.prev_size = 0
           self.sr.last_break = None
           self.reversal.consolidation_count = 0
-          self.sr.breaks = {"support": [], "resistance": []}
+          self.sr.breaks = {"support": {"doji":0,"momentum":0,"high_volatility":0}, "resistance": {"doji":0,"momentum":0,"high_volatility":0}}
           self.sr.bounces = {"support": [], "resistance": []}
-          self.sr.resistance= []
-          self.sr.support = []
           self.sr.red_candles = []
           self.sr.green_candles = []
+          self.sr.support=[]
+          self.sr.resistance = []
           self.sr.candle_size = []
           self.sr.last_candle = None
-          self.sr_config["support"] = []
-          self.sr_config["resistance"] = []
-          self.sr_config["tolerance"] = 2
-          self.sr.break_buffer_detailed={
-                "support": {},  # Format: {zone_price: [size1, size2, ...]}
-                "resistance": {}
-          }
+          sr_config["tolerance"] = 2.4
+          sr_config["support"] = []
+          sr_config["resistance"] = []
+          self.sr.break_buffer_detailed["support"].clear()
+          self.sr.break_buffer_detailed["resistance"].clear()
           print("✅ Server state reset complete.")
         except Exception as e:
             print(f"server reset failed: {e}")
@@ -111,7 +110,6 @@ class SmartServer:
         self.sr = SRManager(self)
         self.log = AlertLogger(self.conn)
         self.reversal = Reversal()
-        self.sr_config = sr_config
 
     def start(self):
         if not self.initialize():

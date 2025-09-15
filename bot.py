@@ -10,7 +10,7 @@ CHAT_ID = "5904387124"
 
 
 sr_config = {
-    "tolerance": [],  # Default tolerance for support/resistance
+    "tolerance": 2.5,  # Default tolerance for support/resistance
     "support": [],
     "resistance": []
 }
@@ -40,7 +40,7 @@ def send_telegram_alert(message):
 @bot.message_handler(commands=["reset_server"])
 def handle_reset(msg):
     if server_instance:
-        server_instance.reset_state()
+        server_instance.reset_state(sr_config)
         send_telegram_alert("🔄 *Server state has been reset via Telegram.*")
     else:
         send_telegram_alert("⚠️ Cannot reset. Server not linked.")

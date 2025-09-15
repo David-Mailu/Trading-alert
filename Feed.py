@@ -38,6 +38,7 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
                 "close": close,
                 "high": candle['high'],
                 "low": candle['low'],
+                "volume": candle['tick_volume'],
                 "timestamp": datetime.fromtimestamp(candle['time']).isoformat()
             }
 

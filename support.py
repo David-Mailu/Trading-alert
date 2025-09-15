@@ -6,7 +6,7 @@ from bot import send_telegram_alert
 from requests.exceptions import RequestException
 # 🕒 Market Schedule Handler
 class MarketSchedule:
-    def wait_next_quarter(self, buffer_seconds=0.5):
+    def wait_next_quarter(self, buffer_seconds=0.25):
         """
         Waits until buffer_seconds after the next quarter-hour mark.
         Ensures candle is finalized before fetching.
@@ -47,6 +47,32 @@ class MarketSchedule:
         eat = timezone("Africa/Nairobi")
         return datetime.now(eat).hour == 0
 
+    def market_session(self):
+        eat = timezone("Africa/Nairobi")
+        now = datetime.now(eat)
+        hr, min = now.hour, now.minute
+        time_decimal = hr + min / 60
+
+        # Define session windows in EAT (UTC+3)
+        sessions = {
+            "Asian": (3.0, 12.0),
+            "London": (10.0, 19.0),
+            "New York": (16.0, 25.0)  # Wraps past midnight
+        }
+
+        active_sessions = []
+        for name, (start, end) in sessions.items():
+            if start < end:
+                if start <= time_decimal < end:
+                    active_sessions.append(name)
+            else:  # Handles wraparound (e.g., NY session)
+                if time_decimal >= start or time_decimal < end - 24:
+                    active_sessions.append(name)
+
+        if not active_sessions:
+            return "Closed"
+
+        return " & ".join(active_sessions)
 # 📡 Candle Fetcher with Retry Logic
 class CandleFetcher:
     def pull(self):

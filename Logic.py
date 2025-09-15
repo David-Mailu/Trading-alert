@@ -62,7 +62,7 @@ class Reversal:
         directions = [float(c["close"]) < float(c["open"]) for c in next_two] if base_direction == "up" else \
                      [float(c["close"]) > float(c["open"]) for c in next_two]
 
-        if all(directions) and any(s >= 2 for s in sizes):
+        if all(directions) and any(s >= 1.4 for s in sizes):
             ts = datetime.now().strftime("%Y-%m-%d %H:%M")
             if base_direction == "up":
                 close_last = float(next_two[-1]["close"])
@@ -146,7 +146,7 @@ class SRManager:
             self.promote_zone(price,direction)
             # ⚡ Volatility / Momentum Notifications
             if (abs(self.prev_size) + abs(size)) > 10 and direction == self.prev_dir:
-                msg = f"⚡ High Volatility! Size: ${self.prev_size + size}"
+                msg = f"⚡ High Volatility! Size: ${self.prev_size + size} and current price: {price}"
                 self.log.log(msg)
             else:
                 similar = (
