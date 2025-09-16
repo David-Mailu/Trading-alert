@@ -4,13 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="to prevent chaos i automated zone clean up based on retaining old zones when the new zones are closer to the old zone, next is to add context on when to">
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="solved all bugs that had derailed me ,next is modify reversal logic to be more precise">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Feed.py" beforeDir="false" afterPath="$PROJECT_DIR$/Feed.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/MT5SIMULATION.PY.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/bot.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/support.py" beforeDir="false" afterPath="$PROJECT_DIR$/support.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -306,7 +305,15 @@
       <option name="project" value="LOCAL" />
       <updated>1757433498920</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="solved all bugs that had derailed me ,next is modify reversal logic to be more precise">
+      <option name="closed" value="true" />
+      <created>1757948727893</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1757948727893</updated>
+    </task>
+    <option name="localTasksCounter" value="20" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -345,14 +352,15 @@
     <MESSAGE value="added zone promotion based on breaks by set threshold, next will be adding bearish and bullish engulfing reversal logic and zone addition based on reversals" />
     <MESSAGE value="added dynamic zone addition depending on reversals" />
     <MESSAGE value="to prevent chaos i automated zone clean up based on retaining old zones when the new zones are closer to the old zone, next is to add context on when to" />
-    <option name="LAST_COMMIT_MESSAGE" value="to prevent chaos i automated zone clean up based on retaining old zones when the new zones are closer to the old zone, next is to add context on when to" />
+    <MESSAGE value="solved all bugs that had derailed me ,next is modify reversal logic to be more precise" />
+    <option name="LAST_COMMIT_MESSAGE" value="solved all bugs that had derailed me ,next is modify reversal logic to be more precise" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Logic.py</url>
-          <line>218</line>
+          <line>272</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

@@ -1,7 +1,7 @@
 import socket, time,threading
 from datetime import datetime, timedelta
 import bot
-from Feed import get_xauusd_15min_candles
+from Feed import get_xauusd_init_data
 from Logic import Reversal, SRManager
 from support import MarketSchedule, CandleFetcher, AlertLogger
 from bot import  sr_config, send_telegram_alert, start_bot
@@ -36,7 +36,6 @@ class SmartServer:
         print("Executing server reset...")
         try:
           print("🔄 Resetting internal server state...")
-          self.sr.reversal_buffer = []
           self.sr.prev_dir = None
           self.sr.prev_size = 0
           self.sr.last_break = None
@@ -67,25 +66,31 @@ class SmartServer:
         print("📥 Auto-fetching last candle for initialization...")
 
         for attempt in range(1, max_retries + 1):
-            candle = get_xauusd_15min_candles()
-            if candle:
-                open_ = candle["open"]
-                close = candle["close"]
-                size = (close - open_)
-                direction = "up" if close > open_ else "down"
-                if direction=="up":
+            df= get_xauusd_init_data()
+            if df is not None and len(df) >= 3:
+                records=df.to_dict('records')[-3:]
+                base,next1,candle=records
+                print("✅ Initialization successful with fetched candle data.")
+                self.sr.reversal_buffer=[base,next1,candle]
+                print("Reversal buffer initialized with last 3 candles.")
+                if candle:
+                  open_ = float(candle["open"])
+                  close = float(candle["close"])
+                  size = (close - open_)
+                  print(f"🔍 Candle Data ➝ Open: {open_}, Close: {close}")
+                  direction = "up" if close > open_ else "down"
+                  if direction=="up":
                     self.sr.green_candles.append(size)
-                elif direction=="down":
+                  elif direction=="down":
                     self.sr.red_candles.append(size)
-                else:
-                    return None
-                self.sr.prev_dir = direction
-                self.sr.prev_size = size
-                self.sr.candle_size.append(size)
-                self.sr.reversal_buffer.append(candle)
-
-                print(f"📈 Previous direction: {direction}")
-                print(f"💡 Previous candle size: {size}")
+                  else:
+                      print("❌ Candle has no direction. Initialization failed.")
+                      return False
+                  self.sr.prev_dir = direction
+                  self.sr.prev_size = size
+                  self.sr.candle_size.append(size)
+                  print(f"📈 Previous direction: {direction}")
+                  print(f"💡 Previous candle size: {size}")
                 self.sr.init_zones()
                 return True
 

@@ -1,3 +1,4 @@
+from bdb import effective
 from collections import deque
 from datetime import datetime, timedelta
 
@@ -25,7 +26,7 @@ class Reversal:
             return 0, 0
         return upper_wick, lower_wick
 
-    def is_downward_reversal(self, candle, next_two):
+    def is_downward_reversal(self, candle, next_two,base_direction):
         upper, lower = self.get_wicks(candle)
         if upper and lower is None:
             print("🚫 Invalid candle data for downward reversal check.")
@@ -33,7 +34,7 @@ class Reversal:
         sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
         directions = [float(c["close"]) < float(c["open"]) for c in next_two]
 
-        if upper > lower  and all(directions) and any(s >= 2 for s in sizes):
+        if upper > lower  and all(directions) and base_direction=="up" and any(s >= 2 for s in sizes):
             high = float(candle["high"])
             close_last = float(next_two[-1]["close"])
             size = round(high - close_last, 2)
@@ -41,7 +42,7 @@ class Reversal:
             return f"🔻 Downward Reversal (wick) at {ts}, size: ${size}"
         return None
 
-    def is_upward_reversal(self, candle, next_two):
+    def is_upward_reversal(self, candle, next_two,base_direction):
         upper, lower = self.get_wicks(candle)
         if upper and lower is None:
             print("🚫 Invalid candle data for upward reversal check.")
@@ -49,7 +50,7 @@ class Reversal:
         sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
         directions = [float(c["close"]) > float(c["open"]) for c in next_two]
 
-        if lower >upper and all(directions) and any(s >= 2 for s in sizes):
+        if lower >upper and all(directions) and base_direction=="down" and any(s >= 2 for s in sizes):
             close_curr = float(next_two[-1]["close"])
             lows = [float(c["low"]) for c in next_two]
             size = round(close_curr - min(lows), 2)
@@ -74,6 +75,45 @@ class Reversal:
                 low = min(float(c["low"]) for c in next_two)
                 size = round(close_last - low, 2)
                 return f"🔺 Pullback Reversal (Up) at {ts}, size: ${size}"
+        return None
+
+    def engulfing_reversal(self, last_three, base_direction):
+        """
+        Detects bullish or bearish engulfing reversal based on last three candles and base direction.
+        Returns a formatted string if reversal is detected, else None.
+        """
+
+        if len(last_three) != 3:
+            return None  # Ensure exactly three candles are passed
+
+        c1, c2, c3 = last_three  # c1 = next1, c2 = next2, c3 = next3
+
+        # Direction helpers
+        def is_up(c):
+            return float(c["close"]) > float(c["open"])
+
+        def is_down(c):
+            return float(c["close"]) < float(c["open"])
+
+        def body_size(c):
+            return abs(float(c["close"]) - float(c["open"]))
+
+        # Sizes
+        size_c2 = body_size(c2)
+        size_c3 = body_size(c3)
+
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        # 🔻 Bearish Engulfing Reversal
+        if base_direction == "up" and is_up(c1) and is_up(c2) and is_down(c3):
+            if size_c3 > size_c2 and size_c3 >= 4:
+                return f"🔻 Bearish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)}"
+
+        # 🔺 Bullish Engulfing Reversal
+        if base_direction == "down" and is_down(c1) and is_down(c2) and is_up(c3):
+            if size_c3 > size_c2 and size_c3 >= 4:
+                return f"🔺 Bullish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)}"
+
         return None
 
     def detect_consolidation(self, last_three):
@@ -113,24 +153,38 @@ class SRManager:
                 return None
             self.store_candle(size)
             self.reversal_buffer.append(candle)
-            if len(self.reversal_buffer) > 3:
+            if len(self.reversal_buffer) > 4:
                 self.reversal_buffer.pop(0)
 
-            if len(self.reversal_buffer) == 3:
-                base, next1, next2 = self.reversal_buffer
+            if len(self.reversal_buffer) == 4:
+                base, next1, next2,next3 = self.reversal_buffer
                 msgs = []
+                base_size = (float(base["close"]) - float(base["open"]))
+                baze_direction = "up" if float(base["close"]) > float(base["open"]) else "down" if float(base["close"]) < float(base["open"]) else None
+                next1_size = (float(next1["close"]) - float(next1["open"]))
+                next1_direction = "up" if float(next1["close"]) > float(next1["open"]) else "down" if float(next1["close"]) < float(next1["open"]) else None
+                effective_size=base_size+next1_size
+                if effective_size>=2 and baze_direction=="up" and next1_direction=="up":
+                    base_direction = "up"
+                elif effective_size<=-2 and baze_direction=="down" and next1_direction=="down":
+                    base_direction = "down"
+                else:
+                    base_direction=None
 
-                m1 = self.reversal.is_downward_reversal(base, [next1, next2])
+                m1 = self.reversal.is_downward_reversal(next1, [next2, next3],base_direction)
                 if m1: msgs.append(m1)
 
-                m2 = self.reversal.is_upward_reversal(base, [next1, next2])
+                m2 = self.reversal.is_upward_reversal(next1, [next2, next3],base_direction)
                 if m2: msgs.append(m2)
 
-                m3 = self.reversal.is_pullback_reversal([next1, next2],
-                     "up" if base["close"] > base["open"] else "down" )
+                m3 = self.reversal.is_pullback_reversal([next2, next3],
+                      base_direction )
                 if m3: msgs.append(m3)
-                self.add_zone(base, [next1, next2],
-                     "up" if base["close"] > base["open"] else "down", direction)
+                m4 = self.reversal.engulfing_reversal([next1, next2, next3],
+                      base_direction )
+                if m4: msgs.append(m4)
+                self.add_zone(next1, [next2, next3],
+                     base_direction, direction)
 
                 for msg in msgs:
                     self.log.log(msg)
@@ -249,7 +303,7 @@ class SRManager:
     def get_nearest_zone(self, zone_type, price):
         zones = self.support if zone_type == "support" else self.resistance
         if not zones:
-            print("🚫 No zones defined.")
+            print (f"🚫 No: {zones} defined.")
             return None
         nearest = min(zones, key=lambda z: abs(z - price))
         return nearest
@@ -311,14 +365,14 @@ class SRManager:
                 if price in self.support:
                     self.support.remove(price)
 
-    def add_zone(self, base, next_two, base_direction, direction):
-        new_zone = float(base["high"]) if direction == "down" else float(base["low"])
-        if self.reversal.is_upward_reversal(base, next_two) and direction == "up":
+    def add_zone(self, next1, next_two, base_direction, direction):
+        new_zone = float(next1["high"]) if direction == "down" else float(next1["low"])
+        if self.reversal.is_upward_reversal(next1, next_two,base_direction) and direction == "up":
             if new_zone not in self.support:
                 self.support.append(new_zone)
             if new_zone in self.resistance:
                 self.resistance.remove(new_zone)
-        elif self.reversal.is_downward_reversal(base, next_two) and direction == "down":
+        elif self.reversal.is_downward_reversal(next1, next_two,base_direction) and direction == "down":
             if new_zone not in self.resistance:
                 self.resistance.append(new_zone)
             if new_zone in self.support:
