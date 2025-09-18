@@ -72,7 +72,8 @@ class SmartServer:
                 base,next1,candle=records
                 print("✅ Initialization successful with fetched candle data.")
                 self.sr.reversal_buffer=[base,next1,candle]
-                print("Reversal buffer initialized with last 3 candles.")
+                self.sr.store_candle=[base,next1,candle]
+                print("Reversal buffer and store candle initialized with last 3 candles.")
                 if candle:
                   open_ = float(candle["open"])
                   close = float(candle["close"])
@@ -88,7 +89,6 @@ class SmartServer:
                       return False
                   self.sr.prev_dir = direction
                   self.sr.prev_size = size
-                  self.sr.candle_size.append(size)
                   print(f"📈 Previous direction: {direction}")
                   print(f"💡 Previous candle size: {size}")
                 self.sr.init_zones()

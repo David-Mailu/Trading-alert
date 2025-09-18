@@ -116,24 +116,52 @@ class Reversal:
 
         return None
 
-    def detect_consolidation(self, last_three):
-        open_first = last_three[0].get("open")
-        close_last = last_three[-1].get("close")
-        if not isinstance(open_first,(int,float)) or not isinstance(close_last,(int,float)):
-            print("🚫 Invalid candle data for consolidation check.")
+    def reversal(self, store_candle, recent_direction):
+        if len(store_candle) < 5:
+            print("🚫 Not enough candles to evaluate reversal.")
             return None
-        net_move = abs(close_last - open_first)
-        if net_move < 1:
-            self.consolidation_count += 1
-            if self.consolidation_count >=3 and not self.consolidation_triggered:
-                self.consolidation_triggered = True
-                ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-                return f"⏸️ consolidation detected at {ts}, range: ${round(net_move, 2)}"
-        else:
-            self.consolidation_count = 0
-            self.consolidation_triggered=False
-        return None
 
+        base, next1, next2, next3, next4 = store_candle[-5:]
+
+        try:
+            # Safely cast open/close to float and infer direction
+            d_base = "up" if float(base["close"]) > float(base["open"]) else "down"
+            d_next1 = "up" if float(next1["close"]) > float(next1["open"]) else "down"
+            d_next2 = "up" if float(next2["close"]) > float(next2["open"]) else "down"
+            d_next3 = "up" if float(next3["close"]) > float(next3["open"]) else "down"
+            size= abs(float(next4["close"]) - float(next1["close"]))
+
+            # Use passed-in direction for the most recent candle
+            d_next4 = recent_direction
+
+            size_next4 = abs(float(next4["close"]) - float(next4["open"]))
+        except (KeyError, TypeError, ValueError):
+            print("🚫 Invalid candle structure or non-numeric values.")
+            return None
+
+        # Upward reversal pattern
+        if (
+                d_base == "down" and
+                d_next1 == "down" and
+                d_next2 == "up" and
+                d_next3 == "down" and
+                d_next4 == "up" and
+                size_next4 >= 3
+        ):
+            return f"🔼 upward reversal detected size: ${round(size,2)}"
+
+        # Downward reversal pattern
+        if (
+                d_base == "up" and
+                d_next1 == "up" and
+                d_next2 == "down" and
+                d_next3 == "up" and
+                d_next4 == "down" and
+                size_next4 >= 3
+        ):
+            return f"🔽 downward reversal detected size: ${round(size,2)}"
+
+        return None
 
 class SRManager:
     def start_logic(self,candle):
@@ -151,7 +179,15 @@ class SRManager:
             else:
                 print(f"doji: {color} and size {size}")
                 return None
-            self.store_candle(size)
+            self.store_candle.append(candle)
+            if len(self.store_candle)>10:
+                self.store_candle.pop(0)
+            msg=self.false_break_aware()
+            if msg:
+                self.log.log(msg)
+            msg=self.reversal.reversal(self.store_candle,direction)
+            if msg:
+                self.log.log(msg)
             self.reversal_buffer.append(candle)
             if len(self.reversal_buffer) > 4:
                 self.reversal_buffer.pop(0)
@@ -164,9 +200,9 @@ class SRManager:
                 next1_size = (float(next1["close"]) - float(next1["open"]))
                 next1_direction = "up" if float(next1["close"]) > float(next1["open"]) else "down" if float(next1["close"]) < float(next1["open"]) else None
                 effective_size=base_size+next1_size
-                if effective_size>=2 and baze_direction=="up" and next1_direction=="up":
+                if effective_size>=2  and next1_direction=="up":
                     base_direction = "up"
-                elif effective_size<=-2 and baze_direction=="down" and next1_direction=="down":
+                elif effective_size<=-2 and next1_direction=="down":
                     base_direction = "down"
                 else:
                     base_direction=None
@@ -187,10 +223,6 @@ class SRManager:
                      base_direction, direction)
 
                 for msg in msgs:
-                    self.log.log(msg)
-
-                msg = self.reversal.detect_consolidation(self.reversal_buffer)
-                if msg:
                     self.log.log(msg)
 
             msg = self.check_break(price, size, direction)
@@ -245,6 +277,7 @@ class SRManager:
     def __init__(self,server):
         self.support=[]
         self.resistance=[]
+        self.prev_false_break =[]
         self.last_color=None
         self.red_candles, self.green_candles = [], []
         self.server=server
@@ -253,7 +286,7 @@ class SRManager:
         self.reversal_buffer = []
         self.prev_dir, self.prev_size = None, 0.0
         self.last_break = None
-        self.candle_size=[]
+        self.store_candle=[]
         self.tolerance = 3.0  # Default tolerance for SR breaks
         self.bounces = {"support": [], "resistance": []}
         # Track break types (for internal insight, optional)
@@ -278,11 +311,6 @@ class SRManager:
 
     def classify(self, size):
         return "doji" if abs(size) < 1 else "momentum" if abs(size) <= 5 else "high_volatility"
-
-    def store_candle(self,size,Max_history=20):
-        self.candle_size.append(size)
-        if len(self.candle_size) > Max_history:
-            self.candle_size.pop(0)
 
     def store_consecutive_candle(self, size, color):
         if color == "green":
@@ -388,6 +416,17 @@ class SRManager:
                     self.resistance.append(new_zone)
                 if new_zone in self.support:
                     self.support.remove(new_zone)
+        elif self.reversal.engulfing_reversal([next1] + next_two, base_direction):
+            if direction == "up":
+                if new_zone not in self.support:
+                    self.support.append(new_zone)
+                if new_zone in self.resistance:
+                    self.resistance.remove(new_zone)
+            else:
+                if new_zone not in self.resistance:
+                    self.resistance.append(new_zone)
+                if new_zone in self.support:
+                    self.support.remove(new_zone)
         else:
             return None
 
@@ -402,3 +441,38 @@ class SRManager:
 
         self.support = filter_oldest(self.support)
         self.resistance = filter_oldest(self.resistance)
+
+    def false_break_aware(self):
+        if len(self.store_candle) < 5:
+            print("🚫 Not enough candles to evaluate false break.")
+            return None
+
+        recent_five = self.store_candle[-5:]
+        last_four = recent_five[:-1]
+        recent_candle = recent_five[-1]
+
+        try:
+            open_first = last_four[0]["open"]
+            close_last = last_four[-1]["close"]
+            recent_open = recent_candle["open"]
+            recent_close = recent_candle["close"]
+        except (KeyError, TypeError):
+            print("🚫 Invalid candle structure.")
+            return None
+
+        net_move = abs(close_last - open_first)
+        recent_size = abs(recent_close - recent_open)
+
+        if net_move < 1 and recent_size >= 2:
+            direction = "up" if recent_close > recent_open else "down"
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            self.prev_false_break.append({
+                "timestamp": ts,
+                "up": 1 if direction == "up" else 0,
+                "down": 1 if direction == "down" else 0
+            })
+
+            return f"⚠️ Possible {direction} false break at {ts}, recent size: {round(recent_size, 2)}"
+
+        return None
