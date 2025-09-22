@@ -4,12 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="reduced modules by letting all feed data come from same location, ensured feed gets last three candle for reversal buffer, added engulfing reversal pattern detection, modified base direction to get a clearer picture, testing tommorow">
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="added false breakout detection,all reversal types detection and tested them. taking a break from programming for a week so that i can design next step mental, signal generator module,continues testing next week to identify possible creeping bugs after extended run">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Feed.py" beforeDir="false" afterPath="$PROJECT_DIR$/Feed.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/progress.md" beforeDir="false" afterPath="$PROJECT_DIR$/progress.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -321,7 +320,15 @@
       <option name="project" value="LOCAL" />
       <updated>1758038111287</updated>
     </task>
-    <option name="localTasksCounter" value="21" />
+    <task id="LOCAL-00021" summary="added false breakout detection,all reversal types detection and tested them. taking a break from programming for a week so that i can design next step mental, signal generator module,continues testing next week to identify possible creeping bugs after extended run">
+      <option name="closed" value="true" />
+      <created>1758202785666</created>
+      <option name="number" value="00021" />
+      <option name="presentableId" value="LOCAL-00021" />
+      <option name="project" value="LOCAL" />
+      <updated>1758202785666</updated>
+    </task>
+    <option name="localTasksCounter" value="22" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -362,14 +369,15 @@
     <MESSAGE value="to prevent chaos i automated zone clean up based on retaining old zones when the new zones are closer to the old zone, next is to add context on when to" />
     <MESSAGE value="solved all bugs that had derailed me ,next is modify reversal logic to be more precise" />
     <MESSAGE value="reduced modules by letting all feed data come from same location, ensured feed gets last three candle for reversal buffer, added engulfing reversal pattern detection, modified base direction to get a clearer picture, testing tommorow" />
-    <option name="LAST_COMMIT_MESSAGE" value="reduced modules by letting all feed data come from same location, ensured feed gets last three candle for reversal buffer, added engulfing reversal pattern detection, modified base direction to get a clearer picture, testing tommorow" />
+    <MESSAGE value="added false breakout detection,all reversal types detection and tested them. taking a break from programming for a week so that i can design next step mental, signal generator module,continues testing next week to identify possible creeping bugs after extended run" />
+    <option name="LAST_COMMIT_MESSAGE" value="added false breakout detection,all reversal types detection and tested them. taking a break from programming for a week so that i can design next step mental, signal generator module,continues testing next week to identify possible creeping bugs after extended run" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Logic.py</url>
-          <line>305</line>
+          <line>313</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

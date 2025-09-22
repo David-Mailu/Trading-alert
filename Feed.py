@@ -67,7 +67,7 @@ def get_xauusd_init_data(max_retries=3, delay_seconds=3):
                 raise RuntimeError(f"Symbol selection failed ➝ {mt5.last_error()}")
 
             # Step 3: Fetch last 4 candles to ensure 3 are fully closed
-            rates = mt5.copy_rates_from_pos("XAUUSD", mt5.TIMEFRAME_M15, 0, 4)
+            rates = mt5.copy_rates_from_pos("XAUUSD", mt5.TIMEFRAME_M15, 0, 5)
             if rates is None or len(rates) < 3:
                 raise ValueError("Not enough candle data retrieved.")
 
@@ -79,7 +79,7 @@ def get_xauusd_init_data(max_retries=3, delay_seconds=3):
             df['size'] = (df['close'] - df['open']).abs()
 
             # Step 6: Return last 3 fully closed candles
-            return df[['time', 'open', 'high', 'low', 'close', 'size']].iloc[-4:-1]
+            return df[['time', 'open', 'high', 'low', 'close', 'size']].iloc[-5:-1]
 
         except Exception as e:
             print(f"⚠️ Error ➝ {e}")

@@ -67,12 +67,12 @@ class SmartServer:
 
         for attempt in range(1, max_retries + 1):
             df= get_xauusd_init_data()
-            if df is not None and len(df) >= 3:
-                records=df.to_dict('records')[-3:]
-                base,next1,candle=records
+            if df is not None and len(df) >= 4:
+                records=df.to_dict('records')[-4:]
+                base,next1,next2,candle=records
                 print("✅ Initialization successful with fetched candle data.")
-                self.sr.reversal_buffer=[base,next1,candle]
-                self.sr.store_candle=[base,next1,candle]
+                self.sr.reversal_buffer=[next1,next2,candle]
+                self.sr.store_candle=[base,next1,next2,candle]
                 print("Reversal buffer and store candle initialized with last 3 candles.")
                 if candle:
                   open_ = float(candle["open"])
