@@ -7,6 +7,7 @@ import pandas as pd
 def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
     symbol = "XAUUSD"
     timeframe = mt5.TIMEFRAME_M15
+    prev_size = None
 
     for attempt in range(1, max_retries + 1):
         print(f"🛠️ Attempt {attempt} ➝ Initializing MetaTrader 5")
@@ -29,10 +30,13 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
             open_ = candle['open']
             close = candle['close']
             size = (close - open_)
+            volume=candle['tick_volume']
 
-            print(f"🔍 Sanity Check ➝ Open: {open_}, Close: {close}, Size: {size}")
+            print(f"🔍 Sanity Check ➝ Open: {open_}, Close: {close}, Size: {size} and Volume: {volume}")
 
-            if abs(size) < 0.01:
+            if abs(size) < 0.01 or (prev_size is not None and prev_size==size):
+                print("candle too small or unchanged, retrying...")
+                prev_size=size
                 raise ValueError("Candle too small ➝ retrying...")
 
             return {
@@ -48,6 +52,8 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
             print(f"⚠️ Error ➝ {e}")
             if attempt < max_retries:
                 time.sleep(delay_seconds)
+            if "size" in locals():
+                prev_size = size
 
     print("❌ All retries failed — no valid candle retrieved.")
     return None

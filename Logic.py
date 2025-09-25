@@ -26,21 +26,6 @@ class Reversal:
             return 0, 0
         return upper_wick, lower_wick
 
-    def is_downward_reversal(self, candle, next_two,base_direction):
-        upper, lower = self.get_wicks(candle)
-        if upper and lower is None:
-            print("🚫 Invalid candle data for downward reversal check.")
-            return None
-        sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
-        directions = [float(c["close"]) < float(c["open"]) for c in next_two]
-
-        if upper > lower  and all(directions) and base_direction=="up" and any(s >= 2 for s in sizes):
-            high = float(candle["high"])
-            close_last = float(next_two[-1]["close"])
-            size = round(high - close_last, 2)
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-            return f"🔻 Downward Reversal (wick) at {ts}, size: ${size} and"
-        return None
 
     def is_wick_reversal(self, candle, next_two,base_direction,tick_volume):
         upper, lower = self.get_wicks(candle)
@@ -72,7 +57,7 @@ class Reversal:
         directions = [float(c["close"]) < float(c["open"]) for c in next_two] if base_direction == "up" else \
                      [float(c["close"]) > float(c["open"]) for c in next_two]
 
-        if all(directions) and any(s >= 1.4 for s in sizes):
+        if all(directions) and any(s >= 1 for s in sizes):
             ts = datetime.now().strftime("%Y-%m-%d %H:%M")
             if base_direction == "up":
                 close_last = float(next_two[-1]["close"])
@@ -116,7 +101,7 @@ class Reversal:
         # 🔻 Bearish Engulfing Reversal
         if base_direction == "up" and is_up(c1) and is_up(c2) and is_down(c3):
             if size_c3 > size_c2 and size_c3 >= 4:
-                return f"🔻 Bearish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {'tick_volume'}"
+                return f"🔻 Bearish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
 
         # 🔺 Bullish Engulfing Reversal
         if base_direction == "down" and is_down(c1) and is_down(c2) and is_up(c3):
@@ -197,20 +182,24 @@ class SRManager:
             if msg:
                 self.log.log(msg)
             self.reversal_buffer.append(candle)
-            if len(self.reversal_buffer) > 4:
+            if len(self.reversal_buffer) > 5:
                 self.reversal_buffer.pop(0)
 
-            if len(self.reversal_buffer) == 4:
-                base, next1, next2,next3 = self.reversal_buffer
+            if len(self.reversal_buffer) == 5:
+                base0,base, next1, next2,next3 = self.reversal_buffer
                 msgs = []
+                base0_size = (float(base0["close"]) - float(base0["open"]))
+                base0_direction = "up" if float(base0["close"]) > float(base0["open"]) else "down" if float(base0["close"]) < float(base0["open"]) else None
                 base_size = (float(base["close"]) - float(base["open"]))
                 baze_direction = "up" if float(base["close"]) > float(base["open"]) else "down" if float(base["close"]) < float(base["open"]) else None
                 next1_size = (float(next1["close"]) - float(next1["open"]))
                 next1_direction = "up" if float(next1["close"]) > float(next1["open"]) else "down" if float(next1["close"]) < float(next1["open"]) else None
-                effective_size=base_size+next1_size
-                if effective_size>=2  and next1_direction=="up":
+                effective_size=base0_size+base_size+next1_size
+                same_dir_base0_next1=(base0_direction==next1_direction) and base0_direction is not None
+                same_dir_base_next1=(baze_direction==next1_direction) and baze_direction is not None
+                if effective_size>=0.1  and (same_dir_base0_next1 or same_dir_base_next1):
                     base_direction = "up"
-                elif effective_size<=-2 and next1_direction=="down":
+                elif effective_size<=-0.1 and (same_dir_base0_next1 or same_dir_base_next1):
                     base_direction = "down"
                 else:
                     base_direction=None
@@ -224,19 +213,19 @@ class SRManager:
                       base_direction,tick_volume )
                 if m4: msgs.append(m4)
                 self.add_zone(next1, [next2, next3],
-                     base_direction, direction,tick_volume)
+                     base_direction, direction,tick_volume,price)
 
                 for msg in msgs:
                     self.log.log(msg)
 
-            msg = self.check_break(price, size, direction)
+            msg = self.check_break(price, size, direction,tick_volume)
             if msg:
                 self.log.log(msg)
             self.depopularize()
             self.promote_zone(price,direction)
             # ⚡ Volatility / Momentum Notifications
             if (abs(self.prev_size) + abs(size)) > 10 and direction == self.prev_dir:
-                msg = f"⚡ High Volatility! Size: ${self.prev_size + size} and current price: {price}"
+                msg = f"⚡ High Volatility! and tick_volume {tick_volume} with Size: ${self.prev_size + size} and current price: {price}"
                 self.log.log(msg)
             else:
                 similar = (
@@ -292,7 +281,7 @@ class SRManager:
         self.prev_dir, self.prev_size = None, 0.0
         self.last_break = None
         self.store_candle=[]
-        self.tolerance = 3.0  # Default tolerance for SR breaks
+        self.tolerance = 2.0  # Default tolerance for SR breaks
         self.bounces = {"support": [], "resistance": []}
         # Track break types (for internal insight, optional)
         self.breaks = {
@@ -341,7 +330,7 @@ class SRManager:
         nearest = min(zones, key=lambda z: abs(z - price))
         return nearest
 
-    def check_break(self, price, size, direction,):
+    def check_break(self, price, size, direction,tick_volume):
         if direction == "down":
             zone_type = "support"
         elif direction == "up":
@@ -366,7 +355,7 @@ class SRManager:
             category = self.classify(effective_size)
             self.breaks[zone_type][category] += 1
             self.break_buffer_detailed[zone_type].setdefault(zone_price, []).append(effective_size)
-            return f"🚨 {zone_type.capitalize()} break at {zone_price} Broken! by Price: {price},  Size: ${round(effective_size,2)}, Type: {category}"
+            return f"🚨 {zone_type.capitalize()} break at {zone_price} Broken! by Price: {price},  Size: ${round(effective_size,2)}, Type: {category} and tick_volume: {tick_volume}"
 
         elif not broken:
             print(f"no break detected  price: {price} not beyond zone: {zone_price} with tolerance: {self.tolerance}")
@@ -398,7 +387,7 @@ class SRManager:
                 if price in self.support:
                     self.support.remove(price)
 
-    def add_zone(self, next1, next_two, base_direction, direction,tick_volume):
+    def add_zone(self, next1, next_two, base_direction, direction,tick_volume,price):
         new_zone = float(next1["high"]) if direction == "down" else float(next1["low"])
         if self.reversal.is_wick_reversal(next1, next_two,base_direction,tick_volume) and direction in [ "up","down"]:
             if direction == "up":
@@ -407,10 +396,10 @@ class SRManager:
                 if new_zone in self.resistance:
                     self.resistance.remove(new_zone)
             else:
-                if new_zone not in self.support:
-                    self.support.append(new_zone)
-                if new_zone in self.resistance:
-                    self.resistance.remove(new_zone)
+                if new_zone not in self.resistance:
+                    self.resistance.append(new_zone)
+                if new_zone in self.support:
+                    self.support.remove(new_zone)
 
         elif self.reversal.is_pullback_reversal(next_two, base_direction,tick_volume) and direction in ["up", "down"]:
             if direction == "up":
@@ -436,6 +425,25 @@ class SRManager:
                     self.resistance.append(new_zone)
                 if new_zone in self.support:
                     self.support.remove(new_zone)
+        elif self.reversal.reversal(self.reversal_buffer,direction,tick_volume) and direction in ["up", "down"]:
+            if direction == "up":
+                if new_zone not in self.support:
+                    self.support.append(new_zone)
+                if new_zone in self.resistance:
+                    self.resistance.remove(new_zone)
+            else:
+                if new_zone not in self.resistance:
+                    self.resistance.append(new_zone)
+                if new_zone in self.support:
+                    self.support.remove(new_zone)
+        elif direction in ["up", "down"]:
+            if direction=="up":
+                if not self.resistance:
+                    new_zone=((int(price)//10)+1)*10
+                    self.resistance.append(new_zone)
+                if not self.support:
+                    new_zone = ((int(price) // 10)) * 10
+                    self.support.append(new_zone)
         else:
             return None
 
@@ -471,10 +479,10 @@ class SRManager:
 
         net_move = abs(close_last - open_first)
         recent_size = abs(recent_close - recent_open)
+        direction="up" if recent_close>recent_open else "down"
+        ts=datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        if net_move < 1 and 2<=recent_size <= 4 :
-            direction = "up" if recent_close > recent_open else "down"
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if net_move < 1.5 and 2<=recent_size <= 4 :
 
             self.prev_false_break.append({
                 "timestamp": ts,
@@ -483,9 +491,8 @@ class SRManager:
             })
 
             return f"⚠️ Possible {direction} false break at {ts}, recent size: {round(recent_size, 2)}"
-        if net_move<=1 and recent_size>4:
-            direction = "up" if recent_close > recent_open else "down"
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+        if net_move<=1.5 and recent_size>4:
+
             self.consolidation_break.append({
                 "timestamp": ts,
                 "up": 1 if direction == "up" else 0,

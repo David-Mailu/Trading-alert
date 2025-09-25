@@ -48,7 +48,7 @@ class SmartServer:
           self.sr.resistance = []
           self.sr.candle_size = []
           self.sr.last_candle = None
-          sr_config["tolerance"] = 2.4
+          sr_config["tolerance"] = 2.1
           sr_config["support"] = []
           sr_config["resistance"] = []
           self.sr.break_buffer_detailed["support"].clear()
@@ -71,9 +71,9 @@ class SmartServer:
                 records=df.to_dict('records')[-4:]
                 base,next1,next2,candle=records
                 print("✅ Initialization successful with fetched candle data.")
-                self.sr.reversal_buffer=[next1,next2,candle]
+                self.sr.reversal_buffer=[base,next1,next2,candle]
                 self.sr.store_candle=[base,next1,next2,candle]
-                print("Reversal buffer and store candle initialized with last 3 candles.")
+                print("Reversal buffer and store candle initialized with last 4 candles.")
                 if candle:
                   open_ = float(candle["open"])
                   close = float(candle["close"])
