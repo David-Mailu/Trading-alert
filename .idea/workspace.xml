@@ -4,12 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="Running and testin the whole week, so for made wick reversal to be one method and i am analysing tick volume to know realtions between tick volume and what happens">
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="Added the ability to add zones if empty list by taking the next round number since i realized gold takes zone by near round numbers, continued testing and refining, i might continue the same next week before starting signal module">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Feed.py" beforeDir="false" afterPath="$PROJECT_DIR$/Feed.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/support.py" beforeDir="false" afterPath="$PROJECT_DIR$/support.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -337,7 +336,15 @@
       <option name="project" value="LOCAL" />
       <updated>1758531633643</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="Added the ability to add zones if empty list by taking the next round number since i realized gold takes zone by near round numbers, continued testing and refining, i might continue the same next week before starting signal module">
+      <option name="closed" value="true" />
+      <created>1758790746555</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1758790746555</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -380,14 +387,15 @@
     <MESSAGE value="reduced modules by letting all feed data come from same location, ensured feed gets last three candle for reversal buffer, added engulfing reversal pattern detection, modified base direction to get a clearer picture, testing tommorow" />
     <MESSAGE value="added false breakout detection,all reversal types detection and tested them. taking a break from programming for a week so that i can design next step mental, signal generator module,continues testing next week to identify possible creeping bugs after extended run" />
     <MESSAGE value="Running and testin the whole week, so for made wick reversal to be one method and i am analysing tick volume to know realtions between tick volume and what happens" />
-    <option name="LAST_COMMIT_MESSAGE" value="Running and testin the whole week, so for made wick reversal to be one method and i am analysing tick volume to know realtions between tick volume and what happens" />
+    <MESSAGE value="Added the ability to add zones if empty list by taking the next round number since i realized gold takes zone by near round numbers, continued testing and refining, i might continue the same next week before starting signal module" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added the ability to add zones if empty list by taking the next round number since i realized gold takes zone by near round numbers, continued testing and refining, i might continue the same next week before starting signal module" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Logic.py</url>
-          <line>302</line>
+          <line>305</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

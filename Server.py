@@ -42,12 +42,8 @@ class SmartServer:
           self.reversal.consolidation_count = 0
           self.sr.breaks = {"support": {"doji":0,"momentum":0,"high_volatility":0}, "resistance": {"doji":0,"momentum":0,"high_volatility":0}}
           self.sr.bounces = {"support": [], "resistance": []}
-          self.sr.red_candles = []
-          self.sr.green_candles = []
           self.sr.support=[]
           self.sr.resistance = []
-          self.sr.candle_size = []
-          self.sr.last_candle = None
           sr_config["tolerance"] = 2.1
           sr_config["support"] = []
           sr_config["resistance"] = []
@@ -80,13 +76,6 @@ class SmartServer:
                   size = (close - open_)
                   print(f"🔍 Candle Data ➝ Open: {open_}, Close: {close}")
                   direction = "up" if close > open_ else "down"
-                  if direction=="up":
-                    self.sr.green_candles.append(size)
-                  elif direction=="down":
-                    self.sr.red_candles.append(size)
-                  else:
-                      print("❌ Candle has no direction. Initialization failed.")
-                      return False
                   self.sr.prev_dir = direction
                   self.sr.prev_size = size
                   print(f"📈 Previous direction: {direction}")
@@ -132,7 +121,7 @@ class SmartServer:
                 self.market.wait_next_quarter()
                 # ⏰ Local time-based reset at midnight
                 if datetime.now().hour == 0 and datetime.now().minute == 0:
-                    self.reset_state()
+                    self.reset_state(sr_config)
 
                 if self.market.in_maintenance():
                     print("😴 Maintenance window (12AM–1AM). Sleeping...")
@@ -150,7 +139,6 @@ class SmartServer:
             print(f"💥 Uncaught error: {e}")
             send_telegram_alert(f"⚠️ *Server error:* `{e}`")
             self.log.log(f"⚠️ *Server error:* `{e}`")
-            self.reset_state()
         finally:
             print("🔌 Closing server...")
             self.conn.close()

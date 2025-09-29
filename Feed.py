@@ -34,7 +34,7 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
 
             print(f"🔍 Sanity Check ➝ Open: {open_}, Close: {close}, Size: {size} and Volume: {volume}")
 
-            if abs(size) < 0.01 or (prev_size is not None and prev_size==size):
+            if abs(size) < 0.001 or (prev_size is not None and prev_size==size):
                 print("candle too small or unchanged, retrying...")
                 prev_size=size
                 raise ValueError("Candle too small ➝ retrying...")
@@ -44,7 +44,7 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
                 "close": close,
                 "high": candle['high'],
                 "low": candle['low'],
-                "volume": candle['tick_volume'],
+                "tick_volume": candle['tick_volume'],
                 "timestamp": datetime.fromtimestamp(candle['time']).isoformat()
             }
 
@@ -85,7 +85,7 @@ def get_xauusd_init_data(max_retries=3, delay_seconds=3):
             df['size'] = (df['close'] - df['open']).abs()
 
             # Step 6: Return last 3 fully closed candles
-            return df[['time', 'open', 'high', 'low', 'close', 'size']].iloc[-5:-1]
+            return df[['time', 'open', 'high', 'low', 'close', 'size','tick_volume']].iloc[-5:-1]
 
         except Exception as e:
             print(f"⚠️ Error ➝ {e}")
