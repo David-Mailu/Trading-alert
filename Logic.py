@@ -110,7 +110,7 @@ class Reversal:
 
         return None
 
-    def reversal(self, store_candle, recent_direction,tick_volume):
+    def reversal(self, store_candle, recent_direction, tick_volume):
         if len(store_candle) < 5:
             print("🚫 Not enough candles to evaluate reversal.")
             return None
@@ -118,43 +118,72 @@ class Reversal:
         base, next1, next2, next3, next4 = store_candle[-5:]
 
         try:
-            # Safely cast open/close to float and infer direction
-            d_base = "up" if float(base["close"]) > float(base["open"]) else "down"
-            d_next1 = "up" if float(next1["close"]) > float(next1["open"]) else "down"
-            d_next2 = "up" if float(next2["close"]) > float(next2["open"]) else "down"
-            d_next3 = "up" if float(next3["close"]) > float(next3["open"]) else "down"
-            size= abs(float(next4["close"]) - float(next1["close"]))
-            # Use passed-in direction for the most recent candle
-            d_next4 = recent_direction
+            # Direction and size calculations
+            candles = [base, next1, next2, next3, next4]
+            directions = []
+            sizes = []
 
-            size_next4 = abs(float(next4["close"]) - float(next4["open"]))
+            for i, candle in enumerate(candles):
+                open_price = float(candle["open"])
+                close_price = float(candle["close"])
+                direction = "up" if close_price > open_price else "down"
+                size = abs(close_price - open_price)
+                directions.append(direction)
+                sizes.append(size)
+
+            # Override direction for most recent candle
+            directions[-1] = recent_direction
+
+            # Shared size metric for output
+            total_size = abs(float(next4["close"]) - float(next1["close"]))
+
         except (KeyError, TypeError, ValueError):
             print("🚫 Invalid candle structure or non-numeric values.")
             return None
 
-        # Upward reversal pattern
+        # ATR-based downward reversal
         if (
-                d_base == "down" and
-                d_next1 == "down" and
-                d_next2 == "up" and
-                d_next3 == "down" and
-                d_next4 == "up" and
-                size_next4 >= 3
+                directions[0] == "down" and sizes[0] >= 0.5 and
+                directions[1] == "down" and sizes[1] >= 0.5 and
+                directions[2] == "up" and sizes[2] >= 4 and
+                directions[3] == "down" and sizes[3] >= 0.1 and
+                directions[4] == "down" and sizes[4] >= 0.5
         ):
-            return f"🔼 upward reversal detected size: ${round(size,2) and tick_volume: {tick_volume}}"
+            return f"🔽  downward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
 
-        # Downward reversal pattern
+        # ATR-based upward reversal
         if (
-                d_base == "up" and
-                d_next1 == "up" and
-                d_next2 == "down" and
-                d_next3 == "up" and
-                d_next4 == "down" and
-                size_next4 >= 3
+                directions[0] == "up" and sizes[0] >=0.5 and
+                directions[1] == "up" and sizes[1] >= 0.5 and
+                directions[2] == "down" and sizes[2] >= 4 and
+                directions[3] == "up" and sizes[3] >=0.1 and
+                directions[4] == "up" and sizes[4] >= 0.5
         ):
-            return f"🔽 downward reversal detected size: ${round(size,2)} and tick_volume: {tick_volume}"
+            return f"🔼  upward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
+
+        # Legacy pattern (optional fallback)
+        if (
+                directions[0] == "down" and
+                directions[1] == "down" and
+                directions[2] == "up" and
+                directions[3] == "down" and
+                directions[4] == "up" and
+                sizes[4] >= 3
+        ):
+            return f"🔼 legacy upward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
+
+        if (
+                directions[0] == "up" and
+                directions[1] == "up" and
+                directions[2] == "down" and
+                directions[3] == "up" and
+                directions[4] == "down" and
+                sizes[4] >= 3
+        ):
+            return f"🔽 legacy downward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
 
         return None
+
 
 class SRManager:
     def start_logic(self,candle):
@@ -276,7 +305,7 @@ class SRManager:
         self.prev_false_break =[]
         self.consolidation_break=[]
         self.prev_base_direction=None
-        self.reversal_zones = {"up": [], "down": []}
+        self.reversal_zones = {"lows": [], "highs": []}
         self.server=server
         self.log = AlertLogger(server.conn)
         self.reversal=Reversal()
@@ -294,8 +323,8 @@ class SRManager:
 
         # Buffer of break sizes per zone
         self.break_buffer_detailed = {
-            "support": {},      # Format: {zone_price: [size1, size2, ...]}
-            "resistance": {}
+            "support": [],      # Format: {"timestamp": ..., "zone": ..., "type": ...}
+            "resistance": []
         }
 
     def init_zones(self):
@@ -365,6 +394,8 @@ class SRManager:
             return None
 
         effective_size = abs(size) if zone_type == "support" else size
+        label="support" if zone_type=="support" else "resistance"
+        ts= datetime.now().strftime("%Y-%m-%d %H:%M")
 
         broken = (
             price < zone_price - self.tolerance if zone_type == "support"
@@ -374,7 +405,7 @@ class SRManager:
         if broken and effective_size > 1:
             category = self.classify(effective_size)
             self.breaks[zone_type][category] += 1
-            self.break_buffer_detailed[zone_type].setdefault(zone_price, []).append(effective_size)
+            self.break_buffer_detailed[label].append({"timestamp": ts, "zone": zone_price, "type": category, "price": price, "size": round(effective_size,2), "tick_volume": tick_volume})
             return f"🚨 {zone_type.capitalize()} break at {zone_price} Broken! by Price: {price},  Size: ${round(effective_size,2)}, Type: {category} and tick_volume: {tick_volume}"
 
         elif not broken:
@@ -407,59 +438,35 @@ class SRManager:
                 if price in self.support:
                     self.support.remove(price)
 
-    def add_zone(self, next1, next_two, base_direction, direction,tick_volume):
-        new_zone = float(next1["high"]) if direction == "down" else float(next1["low"])
-        if self.reversal.is_wick_reversal(next1, next_two,base_direction,tick_volume) and direction in [ "up","down"]:
-            if direction == "up":
-                if new_zone not in self.support:
-                    self.support.append(new_zone)
-                if new_zone in self.resistance:
-                    self.resistance.remove(new_zone)
-            else:
-                if new_zone not in self.resistance:
-                    self.resistance.append(new_zone)
-                if new_zone in self.support:
-                    self.support.remove(new_zone)
-
-        elif self.reversal.is_pullback_reversal(next_two, base_direction,tick_volume) and direction in ["up", "down"]:
-            if direction == "up":
-                if new_zone not in self.support:
-                    self.support.append(new_zone)
-                if new_zone in self.resistance:
-                    self.resistance.remove(new_zone)
-            else:
-                if new_zone not in self.resistance:
-                    self.resistance.append(new_zone)
-                if new_zone in self.support:
-                    self.support.remove(new_zone)
-        elif self.reversal.engulfing_reversal([next1] + next_two, base_direction,tick_volume) and direction in ["up", "down"]:
-            next2 = next_two[-1]
-            new_zone= float(next2["high"]) if direction == "down" else float(next2["low"])
-            if direction == "up":
-                if new_zone not in self.support:
-                    self.support.append(new_zone)
-                if new_zone in self.resistance:
-                    self.resistance.remove(new_zone)
-            else:
-                if new_zone not in self.resistance:
-                    self.resistance.append(new_zone)
-                if new_zone in self.support:
-                    self.support.remove(new_zone)
-        elif self.reversal.reversal(self.reversal_buffer,direction,tick_volume) and direction in ["up", "down"]:
-            if direction == "up":
-                if new_zone not in self.support:
-                    self.support.append(new_zone)
-                if new_zone in self.resistance:
-                    self.resistance.remove(new_zone)
-            else:
-                if new_zone not in self.resistance:
-                    self.resistance.append(new_zone)
-                if new_zone in self.support:
-                    self.support.remove(new_zone)
-        else:
+    def add_zone(self, next1, next_two, base_direction, direction, tick_volume):
+        if direction not in ["up", "down"]:
             return None
 
-    from datetime import datetime
+        # Define reversal checks
+        reversal_checks = [
+            ("wick", self.reversal.is_wick_reversal(next1, next_two, base_direction, tick_volume), next1),
+            ("pullback", self.reversal.is_pullback_reversal(next_two, base_direction, tick_volume), next1),
+            ("engulf", self.reversal.engulfing_reversal([next1] + next_two, base_direction, tick_volume), next_two[-1]),
+            ("buffer", self.reversal.reversal(self.reversal_buffer, direction, tick_volume), next1)
+        ]
+
+        for label, triggered, zone_candle in reversal_checks:
+            if triggered:
+                new_zone = float(zone_candle["high"]) if direction == "down" else float(zone_candle["low"])
+
+                # Update support/resistance
+                target_list = self.support if direction == "up" else self.resistance
+                opposite_list = self.resistance if direction == "up" else self.support
+
+                if new_zone not in target_list:
+                    target_list.append(new_zone)
+                if new_zone in opposite_list:
+                    opposite_list.remove(new_zone)
+
+                return  None # Exit after first valid reversal
+
+        return None
+
 
     def definite_reversal(self, next1, next_two, base_direction, direction, tick_volume,atr,atv,size):
         """
@@ -484,7 +491,7 @@ class SRManager:
 
         # If any reversal confirmed
         if wick or pullback or engulf or buffer:
-            label = "up" if direction == "up" else "down"
+            label = "lows" if direction == "up" else "highs"
             timestamp = datetime.now().isoformat()
 
             if label not in self.reversal_zones:
@@ -492,12 +499,28 @@ class SRManager:
 
             self.reversal_zones[label].append({
                 "price": zone_price,
-                "timestamp": timestamp
+                "timestamp": timestamp,
+                "tick_volume": tick_volume,
+                "atv": atv,
+                "size": size,
+                "atr": atr,
+                "type": self.get_reversal_type(wick, pullback, engulf, buffer)
             })
 
             return f"reversal_{label} and tick_volume: {tick_volume} vs atv: {atv} and size: {size} vs atr: {atr}"
 
         return None
+
+    def get_reversal_type(self, wick, pullback, engulf, buffer):
+        if engulf:
+            return "engulfing"
+        elif wick:
+            return "wick"
+        elif pullback:
+            return "pullback"
+        elif buffer:
+            return "buffer"
+        return "unknown"
 
     def depopularize(self,threshold=3.0):
         def filter_oldest(zones):
@@ -542,9 +565,14 @@ class SRManager:
         recent_size = abs(recent_close - recent_open)
         direction="up" if recent_close>recent_open else "down"
         ts=datetime.now().strftime("%Y-%m-%d %H:%M")
+        label="lows" if recent_close>recent_open else "highs"
+        zone_price= float(recent_candle["low"]) if direction=="up" else float(recent_candle["high"])
 
         if net_move < 1.5 and 2<=recent_size <= 4 :
-
+            self.reversal_zones[label].append({
+                "price": zone_price,
+                "timestamp": ts
+            })
             self.prev_false_break.append({
                 "timestamp": ts,
                 "up": 1 if direction == "up" else 0,
