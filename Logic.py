@@ -71,7 +71,7 @@ class Reversal:
                 return f"🔺 Pullback Reversal (Up) at {ts}, size: ${size} and tick_volume: {tick_volume}"
         return None
 
-    def engulfing_reversal(self, last_three, base_direction,tick_volume):
+    def engulfing_reversal(self, last_three, base_direction,tick_volume,ats_short):
         """
         Detects bullish or bearish engulfing reversal based on last three candles and base direction.
         Returns a formatted string if reversal is detected, else None.
@@ -100,17 +100,17 @@ class Reversal:
 
         # 🔻 Bearish Engulfing Reversal
         if base_direction == "up" and is_up(c1) and is_up(c2) and is_down(c3):
-            if size_c3 > (size_c2+2) and size_c3 >= 4:
+            if size_c3 > (size_c2+2) and size_c3 >= 1.5*ats_short:
                 return f"🔻 Bearish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
 
         # 🔺 Bullish Engulfing Reversal
         if base_direction == "down" and is_down(c1) and is_down(c2) and is_up(c3):
-            if size_c3 > (size_c2+2) and size_c3 >= 4:
+            if size_c3 > (size_c2+2) and size_c3 >=1.5*ats_short:
                 return f"🔺 Bullish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
 
         return None
 
-    def reversal(self, store_candle, recent_direction, tick_volume):
+    def reversal(self, store_candle, recent_direction, tick_volume,ats):
         if len(store_candle) < 5:
             print("🚫 Not enough candles to evaluate reversal.")
             return None
@@ -143,11 +143,11 @@ class Reversal:
 
         # ATR-based downward reversal
         if (
-                directions[0] == "down" and sizes[0] >= 0.5 and
-                directions[1] == "down" and sizes[1] >= 0.5 and
-                directions[2] == "up" and sizes[2] >= 4 and
-                directions[3] == "down" and sizes[3] >= 0.1 and
-                directions[4] == "down" and sizes[4] >= 0.5
+                directions[0] == "down" and sizes[0] >= 0.5*ats and
+                directions[1] == "down" and sizes[1] >= 0.5*ats and
+                directions[2] == "up" and sizes[2] >= 1.5*ats and
+                directions[3] == "down" and sizes[3] >= 0.1*ats and
+                directions[4] == "down" and sizes[4] >= 0.5*ats
         ):
             return f"🔽  downward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
 
@@ -195,18 +195,24 @@ class SRManager:
             self.store_candle.append(candle)
             if len(self.store_candle)>14:
                 self.store_candle.pop(0)
-            stats= self.get_candle_stats()
+            stats= self.get_candle_stats(tick_volume)
             if stats:
                 atr= stats["atr"]
                 atv= stats["atv"]
+                ats= stats["ats"]
+                ats_short= stats["ats_short"]
+                bk_index= stats["breakout_index"]
             else:
                 print("No stats available yet.")
                 atr=None
                 atv=None
+                ats=None
+                ats_short=None
+                bk_index=None
             msg=self.false_break_aware(tick_volume,atr)
             if msg:
                 self.log.log(msg)
-            msg=self.reversal.reversal(self.store_candle,direction,tick_volume)
+            msg=self.reversal.reversal(self.store_candle,direction,tick_volume,ats)
             if msg:
                 self.log.log(msg)
             self.reversal_buffer.append(candle)
@@ -233,7 +239,7 @@ class SRManager:
                 else:
                     base_direction=self.prev_base_direction
                 self.prev_base_direction=base_direction
-                m1= self.definite_reversal(next1, [next2, next3], base_direction, direction,tick_volume,atr,atv,size)
+                m1= self.definite_reversal(next1, [next2, next3], base_direction, direction,tick_volume,atr,atv,size,ats,ats_short)
                 if m1: msgs.append(m1)
                 m2= self.reversal.is_wick_reversal(next1, [next2, next3],base_direction,tick_volume)
                 if m2: msgs.append(m2)
@@ -242,10 +248,10 @@ class SRManager:
                       base_direction,tick_volume )
                 if m3: msgs.append(m3)
                 m4 = self.reversal.engulfing_reversal([next1, next2, next3],
-                      base_direction,tick_volume )
+                      base_direction,tick_volume,ats_short )
                 if m4: msgs.append(m4)
                 self.add_zone(next1, [next2, next3],
-                     base_direction, direction,tick_volume)
+                     base_direction, direction,tick_volume,ats,ats_short)
 
                 for msg in msgs:
                     self.log.log(msg)
@@ -257,7 +263,7 @@ class SRManager:
             self.promote_zone(price,direction)
             # ⚡ Volatility / Momentum Notifications
             if (abs(self.prev_size) + abs(size)) > 10 and direction == self.prev_dir:
-                msg = f"⚡ High Volatility! and tick_volume {tick_volume} with Size: ${self.prev_size + size} and current price: {price} vs atr: {round(atr,2) if atr else 'N/A'}"
+                msg = f"⚡ High Volatility breakout index {bk_index}! and tick_volume {tick_volume} with Size: ${self.prev_size + size} and current price: {price} ats:{round(ats,2)} vs atr: {round(atr,2)}"
                 self.log.log(msg)
             else:
                 similar = (
@@ -338,7 +344,7 @@ class SRManager:
     def classify(self, size):
         return "doji" if abs(size) < 1 else "momentum" if abs(size) <= 5 else "high_volatility"
 
-    def get_candle_stats(self):
+    def get_candle_stats(self,volume):
         """
         Returns a dictionary with ATR and ATV calculated from self.store_candle.
         Requires at least 5 candles.
@@ -350,6 +356,8 @@ class SRManager:
 
         tr_list = []
         volume_list = []
+        size_list=[]
+        tr_ts=[]
 
         for i in range(1, len(self.store_candle)):
             current = self.store_candle[i]
@@ -359,17 +367,32 @@ class SRManager:
             low = current['low']
             prev_close = previous['close']
             volume = current['tick_volume']
+            open=current['open']
+            close=current['close']
 
             tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+            size=abs(close - open)
+            size_list.append(size)
+            tr_ts_ratio=tr/size
+            tr_ts.append(tr_ts_ratio)
             tr_list.append(tr)
             volume_list.append(volume)
 
         atr = float(sum(tr_list) / len(tr_list))
         atv = float(sum(volume_list) / len(volume_list))
+        ats= float(sum(size_list) / len(size_list))
+        atr_ats_ratio= atr/ats
+        atr_ats= float(sum(tr_ts)/len(tr_ts))
+        breakout_index=atr_ats/atr_ats_ratio
+        ats_short= float(sum(size_list[-5:]) / 5) # Last 5 candles average size
+        print (f"📊 ATS_SHORT vs ATS: {ats_short:.2f} vs {ats:.2f} | ATR: {atr:.2f} | ATR/ATS ratio: {atr / ats:.2f} vs breakout index {breakout_index:2f} volume/atv ratio: {volume/atv:.2f}")
 
         return {
             "atr": atr,
-            "atv": atv
+            "atv": atv,
+            "ats": ats,
+            "ats_short": ats_short,
+            "breakout_index": breakout_index
         }
     def get_nearest_zone(self, zone_type, price):
         zones = self.support if zone_type == "support" else self.resistance
@@ -438,21 +461,32 @@ class SRManager:
                 if price in self.support:
                     self.support.remove(price)
 
-    def add_zone(self, next1, next_two, base_direction, direction, tick_volume):
+    def get_extreme_zone(self,candles, direction):
+        if direction == "up":
+            return min(float(c["low"]) for c in candles)
+        elif direction == "down":
+            return max(float(c["high"]) for c in candles)
+        return None
+
+
+    def add_zone(self, next1, next_two, base_direction, direction, tick_volume,ats,ats_short):
         if direction not in ["up", "down"]:
             return None
+
+        next2,next3= next_two  # Assuming next_two = [next2, next3]
+        zone_candidates=[next1,next2,next3]
 
         # Define reversal checks
         reversal_checks = [
             ("wick", self.reversal.is_wick_reversal(next1, next_two, base_direction, tick_volume), next1),
             ("pullback", self.reversal.is_pullback_reversal(next_two, base_direction, tick_volume), next1),
-            ("engulf", self.reversal.engulfing_reversal([next1] + next_two, base_direction, tick_volume), next_two[-1]),
-            ("buffer", self.reversal.reversal(self.reversal_buffer, direction, tick_volume), next1)
+            ("engulf", self.reversal.engulfing_reversal([next1] + next_two, base_direction, tick_volume,ats_short), next3),
+            ("buffer", self.reversal.reversal(self.reversal_buffer, direction, tick_volume,ats), next1)
         ]
 
         for label, triggered, zone_candle in reversal_checks:
             if triggered:
-                new_zone = float(zone_candle["high"]) if direction == "down" else float(zone_candle["low"])
+                new_zone = self.get_extreme_zone(zone_candidates, direction)
 
                 # Update support/resistance
                 target_list = self.support if direction == "up" else self.resistance
@@ -463,12 +497,12 @@ class SRManager:
                 if new_zone in opposite_list:
                     opposite_list.remove(new_zone)
 
-                return  None # Exit after first valid reversal
+                return None  # Exit after first valid reversal
 
         return None
 
-
-    def definite_reversal(self, next1, next_two, base_direction, direction, tick_volume,atr,atv,size):
+    def definite_reversal(self, next1, next_two, base_direction, direction, tick_volume, atr, atv, size, ats,
+                          ats_short):
         """
         Combines all reversal types and logs confirmed reversal zones.
         Returns 'reversal_up' or 'reversal_down' if any reversal is confirmed.
@@ -476,23 +510,25 @@ class SRManager:
         if direction not in ["up", "down"]:
             return None
 
+        next2, next3 = next_two  # Unpack for clarity
+        zone_candidates = [next1, next2, next3]
+
         # Check reversal triggers
         wick = self.reversal.is_wick_reversal(next1, next_two, base_direction, tick_volume)
         pullback = self.reversal.is_pullback_reversal(next_two, base_direction, tick_volume)
-        engulf = self.reversal.engulfing_reversal([next1] + next_two, base_direction, tick_volume)
-        buffer = self.reversal.reversal(self.reversal_buffer, direction, tick_volume)
+        engulf = self.reversal.engulfing_reversal(zone_candidates, base_direction, tick_volume, ats_short)
+        buffer = self.reversal.reversal(self.reversal_buffer, direction, tick_volume, ats)
 
-        # Determine zone price
-        if engulf:
-            next2 = next_two[-1]
-            zone_price = float(next2["low"]) if direction == "up" else float(next2["high"])
-        else:
-            zone_price = float(next1["low"]) if direction == "up" else float(next1["high"])
+        # Determine zone price from extreme candle
+        zone_price = self.get_extreme_zone(zone_candidates, direction)
 
         # If any reversal confirmed
         if wick or pullback or engulf or buffer:
             label = "lows" if direction == "up" else "highs"
             timestamp = datetime.now().isoformat()
+            volume_ratio = tick_volume / atv
+            size_ratio = size / ats
+            atr_ats_ratio = atr / ats
 
             if label not in self.reversal_zones:
                 self.reversal_zones[label] = []
@@ -500,16 +536,19 @@ class SRManager:
             self.reversal_zones[label].append({
                 "price": zone_price,
                 "timestamp": timestamp,
+                "volume_ratio": volume_ratio,
+                "size_ratio": size_ratio,
+                "atr_ats_ratio": atr_ats_ratio,
                 "tick_volume": tick_volume,
-                "atv": atv,
                 "size": size,
                 "atr": atr,
                 "type": self.get_reversal_type(wick, pullback, engulf, buffer)
             })
 
-            return f"reversal_{label} and tick_volume: {tick_volume} vs atv: {atv} and size: {size} vs atr: {atr}"
+            return f"reversal_{label} and tick_volume: {tick_volume} vs atv: {atv} and size: {size} vs ats: {ats} vs atr: {atr} at {timestamp}, price: {zone_price}, volume_ratio: {volume_ratio:.2f}, size_ratio: {size_ratio:.2f}, atr_ats_ratio: {atr_ats_ratio:.2f}"
 
         return None
+
 
     def get_reversal_type(self, wick, pullback, engulf, buffer):
         if engulf:
@@ -540,7 +579,7 @@ class SRManager:
                 self.resistance.append(new_zone)
         if direction == "down":
             if not self.support:
-                new_zone = float(((int(price) // 10)) * 10)
+                new_zone = float((int(price) // 10) * 10)
                 self.support.append(new_zone)
         return None
     def false_break_aware(self,tick_volume,atr):

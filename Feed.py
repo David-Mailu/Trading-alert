@@ -7,7 +7,6 @@ import pandas as pd
 def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
     symbol = "XAUUSD"
     timeframe = mt5.TIMEFRAME_M15
-    prev_size = None
 
     for attempt in range(1, max_retries + 1):
         print(f"🛠️ Attempt {attempt} ➝ Initializing MetaTrader 5")
@@ -34,10 +33,6 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
 
             print(f"🔍 Sanity Check ➝ Open: {open_}, Close: {close}, Size: {size} and Volume: {volume}")
 
-            if abs(size) < 0.001 or (prev_size is not None and prev_size==size):
-                print("candle too small or unchanged, retrying...")
-                prev_size=size
-                raise ValueError("Candle too small ➝ retrying...")
 
             return {
                 "open": open_,
@@ -52,8 +47,6 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
             print(f"⚠️ Error ➝ {e}")
             if attempt < max_retries:
                 time.sleep(delay_seconds)
-            if "size" in locals():
-                prev_size = size
 
     print("❌ All retries failed — no valid candle retrieved.")
     return None
@@ -73,7 +66,7 @@ def get_xauusd_init_data(max_retries=3, delay_seconds=3):
                 raise RuntimeError(f"Symbol selection failed ➝ {mt5.last_error()}")
 
             # Step 3: Fetch last 4 candles to ensure 3 are fully closed
-            rates = mt5.copy_rates_from_pos("XAUUSD", mt5.TIMEFRAME_M15, 0, 5)
+            rates = mt5.copy_rates_from_pos("XAUUSD", mt5.TIMEFRAME_M15, 0, 15)
             if rates is None or len(rates) < 3:
                 raise ValueError("Not enough candle data retrieved.")
 
@@ -85,7 +78,7 @@ def get_xauusd_init_data(max_retries=3, delay_seconds=3):
             df['size'] = (df['close'] - df['open']).abs()
 
             # Step 6: Return last 3 fully closed candles
-            return df[['time', 'open', 'high', 'low', 'close', 'size','tick_volume']].iloc[-5:-1]
+            return df[['time', 'open', 'high', 'low', 'close', 'size','tick_volume']].iloc[-14:-1]
 
         except Exception as e:
             print(f"⚠️ Error ➝ {e}")

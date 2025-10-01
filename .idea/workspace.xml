@@ -4,10 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="Added the ability to calculate atr, atv(avarage true volume)every run time. added the combination od reversal so that it gives a trigger for any reversal and stores the lows and highs which i will code later to define markets. made sure that base direction is always there by taking prevous direction. testing fully tommorrow">
-      <change afterPath="$PROJECT_DIR$/Signals.py" afterDir="false" />
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="Started Signal module, refractored some logic for precision eg method check_breaks,definite_reversal etc">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Feed.py" beforeDir="false" afterPath="$PROJECT_DIR$/Feed.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Signals.py" beforeDir="false" afterPath="$PROJECT_DIR$/Signals.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -351,7 +353,15 @@
       <option name="project" value="LOCAL" />
       <updated>1759158260496</updated>
     </task>
-    <option name="localTasksCounter" value="25" />
+    <task id="LOCAL-00025" summary="Started Signal module, refractored some logic for precision eg method check_breaks,definite_reversal etc">
+      <option name="closed" value="true" />
+      <created>1759241915888</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1759241915888</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -396,14 +406,15 @@
     <MESSAGE value="Running and testin the whole week, so for made wick reversal to be one method and i am analysing tick volume to know realtions between tick volume and what happens" />
     <MESSAGE value="Added the ability to add zones if empty list by taking the next round number since i realized gold takes zone by near round numbers, continued testing and refining, i might continue the same next week before starting signal module" />
     <MESSAGE value="Added the ability to calculate atr, atv(avarage true volume)every run time. added the combination od reversal so that it gives a trigger for any reversal and stores the lows and highs which i will code later to define markets. made sure that base direction is always there by taking prevous direction. testing fully tommorrow" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added the ability to calculate atr, atv(avarage true volume)every run time. added the combination od reversal so that it gives a trigger for any reversal and stores the lows and highs which i will code later to define markets. made sure that base direction is always there by taking prevous direction. testing fully tommorrow" />
+    <MESSAGE value="Started Signal module, refractored some logic for precision eg method check_breaks,definite_reversal etc" />
+    <option name="LAST_COMMIT_MESSAGE" value="Started Signal module, refractored some logic for precision eg method check_breaks,definite_reversal etc" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/Logic.py</url>
-          <line>334</line>
+          <line>340</line>
           <option name="timeStamp" value="1" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
