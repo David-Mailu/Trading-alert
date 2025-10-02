@@ -76,7 +76,7 @@ class MarketSchedule:
 # 📡 Candle Fetcher with Retry Logic
 class CandleFetcher:
     def pull(self):
-        retry_schedule = [10, 600, 1800, 3600]
+        retry_schedule = [10, 300,600, 1800, 3600]
         for i, delay in enumerate(retry_schedule, 1):
             try:
                 candle = get_xauusd_15min_candles()

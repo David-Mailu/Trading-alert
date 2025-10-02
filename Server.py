@@ -23,13 +23,13 @@ class SmartServer:
         send_telegram_alert("🔔 *Alert system resumed.*")
 
     def sync_remote_sr(self, sr_config,max_zones=5):
-        self.sr.support = sr_config.get("support", [])[:]
-        self.sr.resistance = sr_config.get("resistance", [])[:]
+        self.sr.support_liquidity = sr_config.get("support", [])[:]
+        self.sr.resistance_liquidity = sr_config.get("resistance", [])[:]
         self.sr.tolerance = sr_config.get("tolerance", self.sr.tolerance)
-        while len(self.sr.support) > max_zones:
-            self.sr.support.pop(0)
-        while len(self.sr.resistance) > max_zones:
-            self.sr.resistance.pop(0)
+        while len(self.sr.support_liquidity) > max_zones:
+            self.sr.support_liquidity.pop(0)
+        while len(self.sr.resistance_liquidity) > max_zones:
+            self.sr.resistance_liquidity.pop(0)
         print("🔗 Synced SR zones from remote config.")
 
     def reset_state(self,sr_config):
@@ -42,8 +42,8 @@ class SmartServer:
           self.reversal.consolidation_count = 0
           self.sr.breaks = {"support": {"doji":0,"momentum":0,"high_volatility":0}, "resistance": {"doji":0,"momentum":0,"high_volatility":0}}
           self.sr.bounces = {"support": [], "resistance": []}
-          self.sr.support=[]
-          self.sr.resistance = []
+          self.sr.support_liquidity=[]
+          self.sr.resistance_liquidity = []
           sr_config["tolerance"] = 2.1
           sr_config["support"] = []
           sr_config["resistance"] = []
@@ -75,6 +75,7 @@ class SmartServer:
                 if candle:
                   open_ = float(candle["open"])
                   close = float(candle["close"])
+                  volume= float(candle["tick_volume"])
                   size = (close - open_)
                   print(f"🔍 Candle Data ➝ Open: {open_}, Close: {close}")
                   direction = "up" if close > open_ else "down"
@@ -82,6 +83,8 @@ class SmartServer:
                   self.sr.prev_size = size
                   print(f"📈 Previous direction: {direction}")
                   print(f"💡 Previous candle size: {size}")
+                  self.sr.get_candle_stats()
+
                 self.sr.init_zones()
                 return True
 
