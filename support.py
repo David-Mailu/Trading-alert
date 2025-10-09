@@ -1,4 +1,5 @@
 import time
+import socket
 from datetime import datetime,timedelta
 from pytz import timezone
 from Feed import get_xauusd_15min_candles
@@ -17,7 +18,8 @@ class MarketSchedule:
 
         # Next quarter-hour timestamp
         next_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-
+        if next_time <= now:
+            next_time+= timedelta(days=1)
         # Add buffer to ensure candle finalization
         target_time = next_time + timedelta(seconds=buffer_seconds)
         sleep = (target_time - now).total_seconds()
@@ -76,7 +78,7 @@ class MarketSchedule:
 # 📡 Candle Fetcher with Retry Logic
 class CandleFetcher:
     def pull(self):
-        retry_schedule = [10, 300,600, 1800, 3600]
+        retry_schedule = [10,60,100,150,200,300,600,1800]
         for i, delay in enumerate(retry_schedule, 1):
             try:
                 candle = get_xauusd_15min_candles()

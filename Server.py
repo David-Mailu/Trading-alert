@@ -125,6 +125,11 @@ class SmartServer:
                     self.paused_state=False
                 self.market.wait_next_quarter()
                 # ⏰ Local time-based reset at midnight
+                candle = self.fetcher.pull()
+                if not candle:
+                    continue
+                self.sr.start_logic(candle)
+
                 if datetime.now().hour == 0 and datetime.now().minute == 0:
                     self.reset_state(sr_config)
 
@@ -133,10 +138,6 @@ class SmartServer:
                     time.sleep(3600)
                     continue
 
-                candle = self.fetcher.pull()
-                if not candle:
-                    continue
-                self.sr.start_logic(candle)
 
         except KeyboardInterrupt:
             print("🛑 Server interrupted.")

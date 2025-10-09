@@ -31,7 +31,7 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
             size = (close - open_)
             volume=candle['tick_volume']
 
-            print(f"🔍 Sanity Check ➝ Open: {open_}, Close: {close}, Size: {size} and Volume: {volume}")
+            print(f"🔍 Sanity Check ➝ Open: {open_}, Close: {close}, Size: {size:.2f} and Volume: {volume}")
 
 
             return {

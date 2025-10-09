@@ -36,7 +36,7 @@ class Reversal:
         directions_up = [float(c["close"]) > float(c["open"]) for c in next_two]
         direction_down = [float(c["close"]) < float(c["open"]) for c in next_two]
 
-        if lower >upper and all(directions_up) and base_direction=="down" and any(s >= ats_short for s in sizes):
+        if lower >upper and all(directions_up) and base_direction=="down" and any(s >= 0.7*ats_short for s in sizes):
             close_curr = float(next_two[-1]["close"])
             lows = [float(c["low"]) for c in next_two]
             size = round(close_curr - min(lows), 2)
@@ -57,7 +57,7 @@ class Reversal:
         directions = [float(c["close"]) < float(c["open"]) for c in next_two] if base_direction == "up" else \
                      [float(c["close"]) > float(c["open"]) for c in next_two]
 
-        if all(directions) and any(s >=0.9*ats_short for s in sizes):
+        if all(directions) and any(s >=0.5*ats_short for s in sizes):
             ts = datetime.now().strftime("%Y-%m-%d %H:%M")
             if base_direction == "up":
                 close_last = float(next_two[-1]["close"])
@@ -209,6 +209,7 @@ class SRManager:
                 avr_atr_index= stats["avr_atr_index"]
                 avr_ats_index= stats["avr_ats_index"]
                 dir_index=bk_index*volume_index*atr_index*ats_index
+                strength_index= stats["strength_index"]
             else:
                 print("No stats available yet.")
                 atr=None
@@ -223,7 +224,8 @@ class SRManager:
                 avr_atr_index=None
                 avr_ats_index=None
                 dir_index=None
-            msg=self.false_break_aware(tick_volume,atr)
+                strength_index=None
+            msg=self.false_break_aware(tick_volume,atr,ats_short)
             if msg:
                 self.log.log(msg)
             msg=self.reversal.reversal(self.store_candle,direction,tick_volume,ats)
@@ -253,7 +255,7 @@ class SRManager:
                 else:
                     base_direction=self.prev_base_direction
                 self.prev_base_direction=base_direction
-                m1= self.definite_reversal(next1, [next2, next3], base_direction, direction,tick_volume,atr,atv,size,ats,ats_short)
+                m1= self.definite_reversal(next1, [next2, next3], base_direction, direction,tick_volume,atr,atv,size,ats,ats_short,strength_index)
                 if m1: msgs.append(m1)
                 m2= self.reversal.is_wick_reversal(next1, [next2, next3],base_direction,tick_volume,ats_short)
                 if m2: msgs.append(m2)
@@ -273,15 +275,15 @@ class SRManager:
             msg = self.check_break(price, size, direction,tick_volume,ats)
             if msg:
                 self.log.log(msg)
-            self.depopularize()
-            self.promote_zone(price,direction)
+            self.depopularize(atr)
+            self.promote_zone(price,direction,ats)
             # ⚡ Volatility / Momentum Notifications
             if (abs(self.prev_size) + abs(size)) > 10 and direction == self.prev_dir:
-                msg = f"⚡ High Volatility AVG volume index {avr_volume_index} vs AVG ATR index{avr_atr_index}! AVG ATS index {avr_ats_index} and tick_volume {tick_volume} with Size: ${self.prev_size + size} and current price: {price} ats:{round(ats,2)} vs atr: {round(atr,2)}"
+                msg = f"⚡ High Volatility AVG volume index {avr_volume_index} vs AVG ATR index{avr_atr_index}! AVG ATS index {avr_ats_index} and tick_volume {tick_volume} with Size: ${self.prev_size + size:.2f} and current price: {price} ats:{round(ats,2)} vs atr: {round(atr,2)}"
                 self.log.log(msg)
             else:
                 similar = (
-                        self.prev_size and abs(abs(size) - abs(self.prev_size)) < 0.5
+                        self.prev_size and abs(abs(size) - abs(self.prev_size)) < 0.5*atr
                         and direction == self.prev_dir
                 )
                 clustered = (
@@ -387,12 +389,12 @@ class SRManager:
             current = self.store_candle[i]
             previous = self.store_candle[i - 1]
 
-            high = current['high']
-            low = current['low']
-            prev_close = previous['close']
-            volume = current['tick_volume']
-            open=current['open']
-            close=current['close']
+            high = float(current['high'])
+            low = float(current['low'])
+            prev_close =float(previous['close'])
+            volume = float(current['tick_volume'])
+            open=float(current['open'])
+            close=float(current['close'])
 
             tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
             size=abs(close - open)
@@ -429,8 +431,10 @@ class SRManager:
             avr_ats_index= float(sum(self.ats_ind_list)/len(self.ats_ind_list))
         else:
             avr_ats_index=ats_index
-        print (f"📊 ATS_SHORT vs ATS: {ats_short:.2f} vs {ats:.2f} | ATR: {atr:.2f} | ATR/ATS ratio: {atr / ats:.2f} vs breakout index {breakout_index:2f} vs  ATS index {ats_index:2f} ATR index {atr_index:2f} volume index {volume_index:2f} volume/atv ratio: {volume/atv:.2f}")
-        print(f"📊 3-candle Avg Volume Index: {avr_volume_index:.2f} |  Avg ATR Index: {avr_atr_index:.2f}  Avg ATS Index: {avr_ats_index:.2f}")
+        commit_index=avr_ats_index*avr_atr_index*avr_volume_index
+        strength_index=commit_index**(1/3)
+        print (f"📊 ATS_SHORT vs ATS: {ats_short:.2f} vs {ats:.2f} | ATR: {atr:.2f} | ATR/ATS ratio: {atr / ats:.2f} vs breakout index {breakout_index:.2f} vs  ATS index {ats_index:.2f} ATR index {atr_index:.2f} volume index {volume_index:.2f} volume/atv ratio: {volume/atv:.2f}")
+        print(f"📊 3-candle Avg Volume Index: {avr_volume_index:.2f} |  Avg ATR Index: {avr_atr_index:.2f}  Avg ATS Index: {avr_ats_index:.2f} | Commitment Index: {commit_index:.2f} | Strength Index: {strength_index:.2f}")
         return {
             "atr": atr,
             "atv": atv,
@@ -442,7 +446,8 @@ class SRManager:
             "volume_index": volume_index,
             "avr_volume_index": avr_volume_index,
             "avr_atr_index": avr_atr_index,
-            "avr_ats_index": avr_ats_index
+            "avr_ats_index": avr_ats_index,
+            "strength_index": strength_index
         }
     def get_nearest_zone(self, zone_type, price):
         zones = self.support if zone_type == "support" else self.resistance
@@ -469,23 +474,25 @@ class SRManager:
         effective_size = abs(size) if zone_type == "support" else size
         label="support" if zone_type=="support" else "resistance"
         ts= datetime.now().strftime("%Y-%m-%d %H:%M")
+        break_size= abs(price - zone_price)
+        threshold= ats if ats<5 else 5
 
         broken = (
-            price < zone_price - self.tolerance if zone_type == "support"
-            else price > zone_price + self.tolerance
+            price < zone_price - threshold if zone_type == "support"
+            else price > zone_price + threshold
         )
 
-        if broken and effective_size > 1:
+        if broken and effective_size > 0.9*threshold:
             category = self.classify(effective_size,ats)
             self.breaks[zone_type][category] += 1
             self.break_buffer_detailed[label].append({"timestamp": ts, "zone": zone_price, "type": category, "price": price, "size": round(effective_size,2), "tick_volume": tick_volume})
-            return f"🚨 {zone_type.capitalize()} break at {zone_price} Broken! by Price: {price},  Size: ${round(effective_size,2)}, Type: {category} and tick_volume: {tick_volume}"
+            return f"🚨 {zone_type.capitalize()} break at {zone_price} Broken! by Price: {price},  Size: ${round(break_size,2)}, Type: {category} and tick_volume: {tick_volume}"
 
         elif not broken:
-            print(f"no break detected  price: {price} not beyond zone: {zone_price} with tolerance: {self.tolerance}")
+            print(f"no break detected  price: {price} not beyond zone: {zone_price} with tolerance: {threshold:.2f}")
             return None
 
-    def promote_zone(self,current_price,direction,threshold=6):
+    def promote_zone(self,current_price,direction,ats):
         if direction == "up":
             zone_type = "resistance"
         elif direction == "down":
@@ -497,7 +504,7 @@ class SRManager:
         if not zone_list:
             print("🚫 No zones found.")
             return None
-
+        threshold = ats * self.tolerance
         for price in zone_list:
             if zone_type == 'resistance' and current_price >= price + threshold:
                 if price not in self.support:
@@ -552,7 +559,7 @@ class SRManager:
         return None
 
     def definite_reversal(self, next1, next_two, base_direction, direction, tick_volume, atr, atv, size, ats,
-                          ats_short):
+                          ats_short,strength_index):
         """
         Combines all reversal types and logs confirmed reversal zones.
         Returns 'reversal_up' or 'reversal_down' if any reversal is confirmed.
@@ -562,7 +569,7 @@ class SRManager:
 
         next2, next3 = next_two  # Unpack for clarity
         zone_candidates = [next1, next2, next3]
-
+        price= float(next3["close"])
         # Check reversal triggers
         wick = self.reversal.is_wick_reversal(next1, next_two, base_direction, tick_volume,ats_short)
         pullback = self.reversal.is_pullback_reversal(next_two, base_direction, tick_volume,ats_short)
@@ -595,7 +602,7 @@ class SRManager:
                 "type": self.get_reversal_type(wick, pullback, engulf, buffer)
             })
 
-            return f"reversal_{direction} and tick_volume: {tick_volume} vs atv: {atv} and size: {size} vs ats: {ats} vs atr: {atr} and price: {zone_price}, volume_ratio: {volume_ratio:.2f}, size_ratio: {size_ratio:.2f}, atr_ats_ratio: {atr_ats_ratio:.2f}"
+            return f"reversal_{direction} and tick_volume: {round(tick_volume,2)} vs atv: {round(atv,2)} and size: {size:.2f} vs ats: {ats:.2f} vs atr: {atr:.2f} and price: {price}, strength indx: {strength_index:.2f}, size_ratio: {size_ratio:.2f}, atr_ats_ratio: {atr_ats_ratio:.2f}"
 
         return None
 
@@ -611,12 +618,12 @@ class SRManager:
             return "buffer"
         return "unknown"
 
-    def depopularize(self,threshold=3.0):
+    def depopularize(self,atr):
         def filter_oldest(zones):
             kept = []
             for price, zone in enumerate(zones):
                 # Check if val is close to any previously kept value
-                if all(abs(zone - prev) > threshold for prev in kept):
+                if all(abs(zone - prev) > atr for prev in kept):
                     kept.append(zone)
             return kept
 
@@ -632,7 +639,7 @@ class SRManager:
                 new_zone = float((int(price) // 10) * 10)
                 self.support.append(new_zone)
         return None
-    def false_break_aware(self,tick_volume,atr):
+    def false_break_aware(self,tick_volume,atr,ats_short):
         if len(self.store_candle) < 5:
             print("🚫 Not enough candles to evaluate false break.")
             return None
@@ -657,7 +664,7 @@ class SRManager:
         label="lows" if recent_close>recent_open else "highs"
         zone_price= float(recent_candle["low"]) if direction=="up" else float(recent_candle["high"])
 
-        if net_move < 1.5 and 2<=recent_size <= 4 :
+        if net_move < ats_short*1.2 <= recent_size <= 0.9*atr:
             self.reversal_zones[label].append({
                 "price": zone_price,
                 "timestamp": ts
@@ -668,8 +675,8 @@ class SRManager:
                 "down": 1 if direction == "down" else 0
             })
 
-            return f"⚠️ Possible {direction} false break at {ts}, recent size: {recent_size} vs atr:{atr} and tick_volume: {tick_volume}"
-        if net_move<=1.5 and recent_size>4:
+            return f"⚠️ Possible {direction} false break  recent size: {recent_size:.2f} vs atr:{atr:.2f} and tick_volume: {tick_volume:.2f}"
+        if net_move<=ats_short*1.2 and recent_size>0.9*atr:
             self.reversal_zones[label].append({
                 "price": zone_price,
                 "timestamp": ts
@@ -680,5 +687,5 @@ class SRManager:
                 "up": 1 if direction == "up" else 0,
                 "down": 1 if direction == "down" else 0
             })
-            return f"⚠️ Possible {direction} consolidation break at {ts}, recent size: {recent_size} vs atr:{atr} and tick_volume: {tick_volume}"
+            return f"⚠️ Possible {direction} consolidation break  recent size: {recent_size:.2f} vs atr:{atr:.2f} and tick_volume: {tick_volume}"
         return None
