@@ -1,7 +1,6 @@
 from bdb import effective
 from collections import deque
 from datetime import datetime, timedelta
-
 from numpy.ma.core import resize
 
 from  support import AlertLogger
@@ -100,12 +99,12 @@ class Reversal:
 
         # 🔻 Bearish Engulfing Reversal
         if base_direction == "up" and is_up(c1) and is_up(c2) and is_down(c3):
-            if size_c3 > (size_c2) and size_c3 >= 1.5*ats_short:
+            if size_c3 > size_c2 and size_c3 >= 1.5*ats_short:
                 return f"🔻 Bearish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
 
         # 🔺 Bullish Engulfing Reversal
         if base_direction == "down" and is_down(c1) and is_down(c2) and is_up(c3):
-            if size_c3 > (size_c2) and size_c3 >=1.5*ats_short:
+            if size_c3 > size_c2 and size_c3 >=1.5*ats_short:
                 return f"🔺 Bullish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
 
         return None
@@ -295,6 +294,7 @@ class SRManager:
 
             # Update previous cycle state
             self.prev_dir, self.prev_size= direction, size
+            return atr
         except Exception as e:
           print(f"💥 Uncaught error in logic: {e}")
           self.log.log(f"⚠️ *logic error:* `{e}`")

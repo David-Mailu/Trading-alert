@@ -94,14 +94,25 @@ class CandleFetcher:
         print("📴 Connection failed.")
         return None
 
-
-# 📋 Alert Logger
 class AlertLogger:
-    def __init__(self, conn): self.conn = conn
-
+    def __init__(self, conn, max_retries=3, retry_delay=1):
+        self.conn = conn
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
     def log(self, msg):
         ts = datetime.now().strftime("%Y-%m-%d %H:%M")
         full = f"[{ts}] {msg}"
         print(full)
-        self.conn.sendall(full.encode('utf-8'))
+
+        if self.conn:
+            for attempt in range(1, self.max_retries + 1):
+                try:
+                    self.conn.sendall(full.encode('utf-8'))
+                    break  # Success
+                except Exception as e:
+                    print(f"[Retry {attempt}] Socket send failed: {e}")
+                    time.sleep(self.retry_delay)
+            else:
+                print("[ERROR] All retries failed. Falling back to Telegram.")
+
         send_telegram_alert(full)

@@ -2,8 +2,8 @@
 
 An intelligent server-client alert system for monitoring XAUUSD price movements and providing real-time notifications on volatility, reversals, and support/resistance (SR) breaks.
 
-Created by [David-Mailu](https://github.com/David-Mailu), this system leverages Python’s socket programming and modular design to deliver fast, focused alerts for disciplined traders.
-Project meant to evolve and become a bot
+Created by [David-Mailu](https://github.com/David-Mailu), this system began as a simple alert engine and is evolving into a modular, antifragile trading bot. It leverages Python’s socket programming, threading, and defensive design to deliver fast, focused alerts for disciplined traders.
+
 ---
 
 ## 🚀 Project Overview
@@ -15,15 +15,21 @@ This system is designed to:
 - Identify SR zones and notify when broken by cumulative price action.
 - Filter noisy signals using candle similarity and clustering logic.
 - Send alerts to both local client and Telegram bot.
+- Maintain antifragile logic through journaling, fallback alerting, and timestamp validation.
 
-### 🧱 Architecture
+---
 
-- `ServerManager.py`: Central orchestration class running alert logic.
-- `client.py`: Passive socket-based listener for notifications.
-- `Feed.py`: Candle data acquisition module (e.g. from TwelveData).
-- `Logic.py`: Contains reversal detection and SR zone management.
-- `support.py`: Utilities including market scheduling and alert handling.
-- `Bot.py`: Sends real-time alerts to configured Telegram bot,enables remote control.
+## 🧱 Architecture
+
+| Module              | Role                                                                 |
+|---------------------|----------------------------------------------------------------------|
+| `ServerManager.py`  | Central orchestrator running the main polling loop and alert logic.  |
+| `client.py`         | Passive socket-based listener for local notifications.               |
+| `Feed.py`           | Candle data acquisition module (e.g. TwelveData, MT5).               |
+| `Logic.py`          | Reversal detection, SR zone management, and volatility scoring.      |
+| `Signals.py`        | Signal engine including Trend, SRManager, and Reversal modules.      |
+| `support.py`        | Utilities for market scheduling, logging, and alert handling.        |
+| `Bot.py`            | Telegram bot integration for remote control and alert dispatch.      |
 
 ---
 
@@ -39,24 +45,28 @@ This system is designed to:
 | 🔂 Wick Filtering           | Filters out misleading SR breaks caused by candle wicks.                                   |
 | 📊 Consolidation Detection  | Flags tight range activity between defined support and resistance.                         |
 | 📤 Telegram Integration     | Sends all qualified alerts to Telegram bot in real-time.                                   |
-## 📦 Telegram Bot Integration & Control Module
+| 🧠 Volatility Scoring       | Calculates ATR, ATS, and volume indices to assess momentum and breakout strength.          |
+| 🧠 Signal Journaling        | Logs every signal with contextual stats for post-trade analysis and system evolution.       |
 
-The system now includes a dedicated `bot.py` module for enhanced user interaction via Telegram. It allows for real-time system control through chat commands.
+---
 
-### 🧭 Features Added via `bot.py`
-- `/pause` – Pauses alert dispatch by setting `server_instance.alerts_active = False`.
-- `/resume` – Reactivates alerts by setting `server_instance.alerts_active = True`.
-- `/status` – Returns current system status including alert state, active feed, and last alert time.
-- Telegram bot links directly to `ServerManager`, enabling two-way control and feedback.
+## 🤖 Telegram Bot Integration & Control
+
+The system includes a dedicated `Bot.py` module for enhanced user interaction via Telegram. It allows for real-time control and feedback through chat commands.
+
+### 🧭 Commands
+
+- `/pause` – Pauses alert dispatch (`server_instance.alerts_active = False`)
+- `/resume` – Reactivates alerts (`server_instance.alerts_active = True`)
+- `/status` – Returns current system status including alert state, active feed, and last alert time
 
 ### 🛠️ Code Integration Note
+
 All alert-state checks should now use:
 
 ```python
 if not server.alerts_active:
     print("🔕 Alert skipped: system is paused.")
----
-
 ## 📦 Installation & Usage
 
 1. Clone the repository:

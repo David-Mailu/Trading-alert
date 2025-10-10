@@ -31,3 +31,8 @@
 - 🔒 Remote shutdown capability via Telegram
 - 🔐 Authentication layer for Telegram commands
 - 🌐 Market module to assess conditions before executor triggers
+- 📊 Historical data analysis for pattern recognition
+- 📈 Backtesting framework for strategy validation
+- 🧪 Unit tests for critical functions
+- 🛠 Error handling and logging improvements
+- 📉 Performance optimization for signal processing

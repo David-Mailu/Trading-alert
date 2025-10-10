@@ -5,7 +5,7 @@ from Feed import get_xauusd_init_data
 from Logic import Reversal, SRManager
 from support import MarketSchedule, CandleFetcher, AlertLogger
 from bot import  sr_config, send_telegram_alert, start_bot
-
+from Signals import Trend
 # 🧠 Smart Alert Server
 class SmartServer:
     def get_status_payload(self):
@@ -107,9 +107,9 @@ class SmartServer:
         self.paused_state = False
         self.fetcher = CandleFetcher()
         self.sr = SRManager(self)
+        self.signal = Trend(self)
         self.log = AlertLogger(self.conn)
         self.reversal = Reversal()
-
     def start(self):
         if not self.initialize():
             return
@@ -128,7 +128,8 @@ class SmartServer:
                 candle = self.fetcher.pull()
                 if not candle:
                     continue
-                self.sr.start_logic(candle)
+                atr=self.sr.start_logic(candle)
+                self.signal.start_signal(atr)
 
                 if datetime.now().hour == 0 and datetime.now().minute == 0:
                     self.reset_state(sr_config)

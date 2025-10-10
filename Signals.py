@@ -1,4 +1,5 @@
 import socket
+import traceback
 from ctypes.wintypes import SMALL_RECT
 
 from Logic import SRManager, Reversal
@@ -8,12 +9,11 @@ from support import AlertLogger
 
 
 class Trend:
-    def __init__(self):
-        self.sr=SRManager(self)
+    def __init__(self,server):
         self.reversal=Reversal()
-        conn=socket.create_connection(("localhost", 65432))
-        self.log=AlertLogger(conn)
-
+        self.server=server
+        self.log=AlertLogger(server.conn)
+        self.sr=SRManager(server)
     def start_signal(self, atr):
         try:
             highs = self.sr.reversal_zones.get("high", [])
@@ -42,6 +42,7 @@ class Trend:
                     return all(timestamps[i] < timestamps[i + 1] for i in range(len(timestamps) - 1))
                 except Exception as e:
                     print(f"unexpected error in safe_chain: {e}")
+                    self.log.log(f"⚠️ *Error in safe_chain:* `{e}`")
                     return False
 
             # Define the sequences
@@ -51,10 +52,22 @@ class Trend:
             # Evaluate both sequences safely
             sec1 = safe_chain(sec1_keys)
             sec2 = safe_chain(sec2_keys)
+            msg= self.classic_uptrend(zones, atr, sec1) or \
+                 self.expansion_buy(zones, atr, sec1) or \
+                 self.contraction(zones, atr, sec1) or \
+                 self.ascending_triangle(zones, atr, sec1) or \
+                 self.descending_midpoint(zones, atr, sec1) or \
+                 self.classic_downtrend(zones, atr, sec2) or \
+                 self.expansion_sell(zones, atr, sec2) or \
+                 self.bull_ears(zones, atr, sec2)
+            if msg:
+                self.log.log(f"🔔 *Trend Signal*: `{msg}`")
+            return False, False
 
-            return sec1, sec2
 
-        except Exception:
+        except Exception as e:
+            print(f"unexpected error in start_signal:{e}")
+            self.log.log(f"⚠️ *Error in start_signal*: `{e}`")
             return False, False
 
 
@@ -140,7 +153,7 @@ class Trend:
 
             equal_high = curr_high - prev1_high <=0.4 * atr
             higher_low = curr_low > prev1_low + 0.3 * atr and prev1_low > prev2_low
-            swing_size = (curr_high - curr_low) >= 0.5 * atr
+            swing_size = (curr_high - curr_low) >= 0.2 * atr
             if equal_high and higher_low and swing_size and sec1:
                 return "🔺 Ascending Triangle detected: Flat Highs and Rising Lows"
             return False
@@ -180,5 +193,21 @@ class Trend:
                 return "📉 Classic Downtrend detected: Lower Highs and Lower Lows"
             return False
 
+        except KeyError:
+            return False
+    def bull_ears(self,zones,atr,sec2):
+        try:
+            curr_high = zones["curr_high"]["price"]
+            prev1_high = zones["prev1_high"]["price"]
+            prev2_high = zones["prev2_high"]["price"]
+            curr_low = zones["curr_low"]["price"]
+            prev1_low = zones["prev1_low"]["price"]
+
+            higher_high = curr_high < prev1_high + 0.3 * atr and prev1_high > prev2_high
+            higher_low = (curr_low -prev1_low )<= atr
+            swing_size = (curr_high - curr_low) >= 0.5 * atr
+            if higher_high and higher_low and swing_size and sec2:
+                return "🚩 sell Bull ears detected"
+            return False
         except KeyError:
             return False
