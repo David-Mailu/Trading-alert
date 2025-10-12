@@ -85,7 +85,7 @@ class SmartServer:
                   print(f"💡 Previous candle size: {size}")
                   self.sr.get_candle_stats()
 
-                self.sr.init_zones()
+                self.sr.init_reversal_zones()
                 return True
 
             print(f"[Init Retry {attempt}] ❌ No valid candle. Retrying in {delay_seconds}s...")

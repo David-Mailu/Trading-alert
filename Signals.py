@@ -59,7 +59,9 @@ class Trend:
                  self.descending_midpoint(zones, atr, sec1) or \
                  self.classic_downtrend(zones, atr, sec2) or \
                  self.expansion_sell(zones, atr, sec2) or \
-                 self.bull_ears(zones, atr, sec2)
+                 self.bull_ears(zones, atr, sec2) or \
+                 self.v_lows(zones, atr, sec1) or \
+                 self.ascending_m(zones, atr, sec1)
             if msg:
                 self.log.log(f"🔔 *Trend Signal*: `{msg}`")
             return False, False
@@ -208,6 +210,40 @@ class Trend:
             swing_size = (curr_high - curr_low) >= 0.5 * atr
             if higher_high and higher_low and swing_size and sec2:
                 return "🚩 sell Bull ears detected"
+            return False
+        except KeyError:
+            return False
+    def v_lows(self,zones,atr,sec1):
+        try:
+            curr_high = zones["curr_high"]["price"]
+            prev1_high = zones["prev1_high"]["price"]
+            curr_low = zones["curr_low"]["price"]
+            prev1_low = zones["prev1_low"]["price"]
+            prev2_low = zones["prev2_low"]["price"]
+
+            lower_high = curr_high < prev1_high + 0.5 * atr
+            lower_low = prev1_low - 0.2 * atr < curr_low < prev2_low and prev1_low < prev2_low
+            swing_size = (curr_high - curr_low) >= atr
+
+            if lower_high and lower_low and swing_size and sec1:
+                return "📈 V-Lows detected possible buy: Sharp Reversal with lower Highs and Lower Lows"
+            return False
+
+        except KeyError:
+            return False
+    def ascending_m(self,zones,atr,sec1):
+        try:
+            curr_high = zones["curr_high"]["price"]
+            prev1_high = zones["prev1_high"]["price"]
+            curr_low = zones["curr_low"]["price"]
+            prev1_low = zones["prev1_low"]["price"]
+            prev2_low = zones["prev2_low"]["price"]
+
+            higher_high = curr_high > prev1_high + 0.3 * atr
+            higher_low = curr_low< prev1_low + 0.3 * atr and prev1_low > prev2_low
+            swing_size = (curr_high - curr_low) >= 0.8 * atr
+            if higher_high and higher_low and swing_size and sec1:
+                return "🚩 buy Ascending M detected"
             return False
         except KeyError:
             return False

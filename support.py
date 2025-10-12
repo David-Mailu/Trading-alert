@@ -42,7 +42,7 @@ class MarketSchedule:
         return not (
             wd in [5, 6] or
             (wd == 4 and (hr > 23 or (hr == 23 and min >= 45))) or
-            (wd == 0 and hr < 2)
+            (wd == 0 and hr < 1)
         )
 
     def in_maintenance(self):

@@ -367,6 +367,34 @@ class SRManager:
             r = input(f"Resistance {i+1}: ").strip()
             if r: self.resistance_liquidity.append(float(r))
 
+    def init_reversal_zones(self):
+        print("📌 Enter Reversal SR levels (up to 4 each):")
+        self.reversal_zones = {"lows": [], "highs": []}
+
+        # Define simulated timestamps (latest first)
+        time_offsets = [3, 2.5, 2, 1.5, 1, 0.5]  # in hours
+        now = datetime.now()
+        offset_index = 0
+
+        for i in range(3):
+            l = input(f"Reversal Support {i + 1}: ").strip()
+            if l:
+                timestamp = now - timedelta(hours=time_offsets[offset_index])
+                self.reversal_zones["lows"].append({
+                    "price": float(l),
+                    "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                })
+                offset_index += 1
+
+            h = input(f"Reversal Resistance {i + 1}: ").strip()
+            if h:
+                timestamp = now - timedelta(hours=time_offsets[offset_index])
+                self.reversal_zones["highs"].append({
+                    "price": float(h),
+                    "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                })
+                offset_index += 1
+
     def classify(self, size,ats):
         return "doji" if abs(size) < 0.5*ats else "momentum" if abs(size) <= 2.5*ats else "high_volatility"
 
