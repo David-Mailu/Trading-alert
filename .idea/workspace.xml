@@ -4,12 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="intergrated signal module with the rest of the system, will continue testing">
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="Might sound unusual that i did something on a weekend but it is because of the needed urgency . i started running on cmd, i have created a bash file, added some pattern methods and initialization of reversal zones for immediate pattern analysis">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Signals.py" beforeDir="false" afterPath="$PROJECT_DIR$/Signals.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/support.py" beforeDir="false" afterPath="$PROJECT_DIR$/support.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -393,7 +391,15 @@
       <option name="project" value="LOCAL" />
       <updated>1760118791632</updated>
     </task>
-    <option name="localTasksCounter" value="30" />
+    <task id="LOCAL-00030" summary="Might sound unusual that i did something on a weekend but it is because of the needed urgency . i started running on cmd, i have created a bash file, added some pattern methods and initialization of reversal zones for immediate pattern analysis">
+      <option name="closed" value="true" />
+      <created>1760292664326</created>
+      <option name="number" value="00030" />
+      <option name="presentableId" value="LOCAL-00030" />
+      <option name="project" value="LOCAL" />
+      <updated>1760292664326</updated>
+    </task>
+    <option name="localTasksCounter" value="31" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -414,7 +420,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="added classes reversal reading" />
     <MESSAGE value="dived some files into modules for easy ACCESS and MAINTENANCE" />
     <MESSAGE value="added finhub as backup, introduced automatic direction and size detection" />
     <MESSAGE value="ADDED telegram message handler for remote reset" />
@@ -439,7 +444,8 @@
     <MESSAGE value="Now i am able to calculate atr_index, ats_index , volume_index which tells me the strength of a move" />
     <MESSAGE value="added various trend types , i am so worked that i cant continue the intergration with the rest of the system, tomorrow evening i will do it" />
     <MESSAGE value="intergrated signal module with the rest of the system, will continue testing" />
-    <option name="LAST_COMMIT_MESSAGE" value="intergrated signal module with the rest of the system, will continue testing" />
+    <MESSAGE value="Might sound unusual that i did something on a weekend but it is because of the needed urgency . i started running on cmd, i have created a bash file, added some pattern methods and initialization of reversal zones for immediate pattern analysis" />
+    <option name="LAST_COMMIT_MESSAGE" value="Might sound unusual that i did something on a weekend but it is because of the needed urgency . i started running on cmd, i have created a bash file, added some pattern methods and initialization of reversal zones for immediate pattern analysis" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

@@ -277,8 +277,8 @@ class SRManager:
             self.depopularize(atr)
             self.promote_zone(price,direction,ats)
             # ⚡ Volatility / Momentum Notifications
-            if (abs(self.prev_size) + abs(size)) > 10 and direction == self.prev_dir:
-                msg = f"⚡ High Volatility AVG volume index {avr_volume_index} vs AVG ATR index{avr_atr_index}! AVG ATS index {avr_ats_index} and tick_volume {tick_volume} with Size: ${self.prev_size + size:.2f} and current price: {price} ats:{round(ats,2)} vs atr: {round(atr,2)}"
+            if (abs(self.prev_size) + abs(size)) >2*atr and atr>=5 and direction == self.prev_dir:
+                msg = f"⚡ High Volatility AVG volume index {avr_volume_index:.2f} vs AVG ATR index{avr_atr_index:.2f}! AVG ATS index {avr_ats_index:.2f} and tick_volume {tick_volume} with Size: ${self.prev_size + size:.2f} and current price: {price} ats:{round(ats,2)} vs atr: {round(atr,2)}"
                 self.log.log(msg)
             else:
                 similar = (
@@ -444,6 +444,7 @@ class SRManager:
         volume_index= volume_short/atv if atv!=0 else 0
         atr_index= atr_short/atr if atr!=0 else 0
         ats_index=ats_short/ats if ats!=0 else 0
+        avg_volume=float(sum(volume_list[-3:])/3) if len(volume_list)>=3 else volume_short
         self.volume_ind_list.append(volume_index)
         self.atr_ind_list.append(atr_index)
         self.ats_ind_list.append(ats_index)
@@ -460,7 +461,11 @@ class SRManager:
         else:
             avr_ats_index=ats_index
         commit_index=avr_ats_index*avr_atr_index*avr_volume_index
-        strength_index=commit_index**(1/3)
+        strength=commit_index**(1/3)
+        if avg_volume>1500 and strength<1:
+            strength_index=1.0
+        else:
+            strength_index=strength
         print (f"📊 ATS_SHORT vs ATS: {ats_short:.2f} vs {ats:.2f} | ATR: {atr:.2f} | ATR/ATS ratio: {atr / ats:.2f} vs breakout index {breakout_index:.2f} vs  ATS index {ats_index:.2f} ATR index {atr_index:.2f} volume index {volume_index:.2f} volume/atv ratio: {volume/atv:.2f}")
         print(f"📊 3-candle Avg Volume Index: {avr_volume_index:.2f} |  Avg ATR Index: {avr_atr_index:.2f}  Avg ATS Index: {avr_ats_index:.2f} | Commitment Index: {commit_index:.2f} | Strength Index: {strength_index:.2f}")
         return {
