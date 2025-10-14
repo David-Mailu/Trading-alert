@@ -129,6 +129,8 @@ class SmartServer:
                 if not candle:
                     continue
                 atr=self.sr.start_logic(candle)
+                if atr :
+                    print(f"server ATR: {atr}")
                 self.signal.start_signal(atr)
 
                 if datetime.now().hour == 0 and datetime.now().minute == 0:

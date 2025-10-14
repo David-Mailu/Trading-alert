@@ -34,7 +34,7 @@ class Trend:
                 "prev2_low": lows[-3],
             }
             if zones :
-                print(f"🔍 Analyzing zones")
+                print(f"🔍 Analyzing zones and ATR={atr}:")
                 print("🔍 Constructed Zones:")
                 for label, zone in zones.items():
                     ts = zone.get("timestamp", "⛔️ No timestamp")

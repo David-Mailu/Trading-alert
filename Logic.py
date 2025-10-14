@@ -26,7 +26,9 @@ class Reversal:
         return upper_wick, lower_wick
 
 
-    def is_wick_reversal(self, candle, next_two,base_direction,tick_volume,ats_short):
+    def is_wick_reversal(self, candle, next_two,base_direction,tick_volume,ats_short,prev_base_direction):
+        if base_direction not in ["up", "down"] and prev_base_direction not in ["up","down"] and base_direction==prev_base_direction:
+            return None
         upper, lower = self.get_wicks(candle)
         if upper and lower is None:
             print("🚫 Invalid candle data for upward reversal check.")
@@ -49,8 +51,8 @@ class Reversal:
             return f"🔻 Downward Reversal (wick) at {ts}, size: ${size} and tick_volume: {tick_volume}"
         return None
 
-    def is_pullback_reversal(self, next_two,base_direction,tick_volume,ats_short):
-        if base_direction not in ["up", "down"]:
+    def is_pullback_reversal(self,next_two,base_direction,tick_volume,ats_short,prev_base_direction):
+        if base_direction not in ["up", "down"] and prev_base_direction not in ["up","down"] and base_direction==prev_base_direction:
             return None
         sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
         directions = [float(c["close"]) < float(c["open"]) for c in next_two] if base_direction == "up" else \
@@ -237,6 +239,7 @@ class SRManager:
             if len(self.reversal_buffer) == 5:
                 base0,base, next1, next2,next3 = self.reversal_buffer
                 msgs = []
+                prev_base_direction=self.prev_base_direction if self.prev_base_direction else "up" if float(base["close"]) > float(base["open"]) else "down" if float(base["close"]) < float(base["open"]) else None
                 size=abs(float(next3["close"])-float(next3["open"]))
                 base0_size = (float(base0["close"]) - float(base0["open"]))
                 base0_direction = "up" if float(base0["close"]) > float(base0["open"]) else "down" if float(base0["close"]) < float(base0["open"]) else None
@@ -254,19 +257,19 @@ class SRManager:
                 else:
                     base_direction=self.prev_base_direction
                 self.prev_base_direction=base_direction
-                m1= self.definite_reversal(next1, [next2, next3], base_direction, direction,tick_volume,atr,atv,size,ats,ats_short,strength_index)
+                m1= self.definite_reversal(next1, [next2, next3], base_direction, direction,tick_volume,atr,atv,size,ats,ats_short,strength_index,prev_base_direction)
                 if m1: msgs.append(m1)
-                m2= self.reversal.is_wick_reversal(next1, [next2, next3],base_direction,tick_volume,ats_short)
+                m2= self.reversal.is_wick_reversal(next1, [next2, next3],base_direction,tick_volume,ats_short,prev_base_direction)
                 if m2: msgs.append(m2)
 
                 m3= self.reversal.is_pullback_reversal([next2, next3],
-                      base_direction,tick_volume,ats_short )
+                      base_direction,tick_volume,ats_short ,prev_base_direction)
                 if m3: msgs.append(m3)
                 m4 = self.reversal.engulfing_reversal([next1, next2, next3],
                       base_direction,tick_volume,ats_short )
                 if m4: msgs.append(m4)
                 self.add_zone(next1, [next2, next3],
-                     base_direction, direction,tick_volume,ats,ats_short)
+                     base_direction, direction,tick_volume,ats,ats_short,prev_base_direction)
 
                 for msg in msgs:
                     self.log.log(msg)
@@ -559,7 +562,7 @@ class SRManager:
         return None
 
 
-    def add_zone(self, next1, next_two, base_direction, direction, tick_volume,ats,ats_short):
+    def add_zone(self, next1, next_two, base_direction, direction, tick_volume,ats,ats_short,prev_base_direction):
         if direction not in ["up", "down"]:
             return None
 
@@ -568,8 +571,8 @@ class SRManager:
 
         # Define reversal checks
         reversal_checks = [
-            ("wick", self.reversal.is_wick_reversal(next1, next_two, base_direction, tick_volume,ats_short), next1),
-            ("pullback", self.reversal.is_pullback_reversal(next_two, base_direction, tick_volume,ats_short), next1),
+            ("wick", self.reversal.is_wick_reversal(next1, next_two, base_direction, tick_volume,ats_short,prev_base_direction), next1),
+            ("pullback", self.reversal.is_pullback_reversal(next_two, base_direction, tick_volume,ats_short,prev_base_direction), next1),
             ("engulf", self.reversal.engulfing_reversal([next1] + next_two, base_direction, tick_volume,ats_short), next3),
             ("buffer", self.reversal.reversal(self.reversal_buffer, direction, tick_volume,ats), next1)
         ]
@@ -591,8 +594,26 @@ class SRManager:
 
         return None
 
+    def is_clustered_zone_recent(self, label, window_minutes=45.5):
+        """
+        Checks if a reversal zone of the given label ('lows' or 'highs') was logged within the last window_minutes.
+        Returns True if a recent zone exists, False otherwise.
+        """
+        now = datetime.now()
+        recent_zones = self.reversal_zones.get(label, [])
+
+        for zone in recent_zones:
+            try:
+                zone_time = datetime.fromisoformat(zone["timestamp"])
+                if now - zone_time < timedelta(minutes=window_minutes):
+                    return True
+            except Exception as e:
+                # Optional: log or handle malformed timestamp
+                continue
+
+        return False
     def definite_reversal(self, next1, next_two, base_direction, direction, tick_volume, atr, atv, size, ats,
-                          ats_short,strength_index):
+                          ats_short,strength_index,prev_base_direction):
         """
         Combines all reversal types and logs confirmed reversal zones.
         Returns 'reversal_up' or 'reversal_down' if any reversal is confirmed.
@@ -604,17 +625,17 @@ class SRManager:
         zone_candidates = [next1, next2, next3]
         price= float(next3["close"])
         # Check reversal triggers
-        wick = self.reversal.is_wick_reversal(next1, next_two, base_direction, tick_volume,ats_short)
-        pullback = self.reversal.is_pullback_reversal(next_two, base_direction, tick_volume,ats_short)
+        wick = self.reversal.is_wick_reversal(next1, next_two, base_direction, tick_volume,ats_short,prev_base_direction)
+        pullback = self.reversal.is_pullback_reversal(next_two, base_direction, tick_volume,ats_short,prev_base_direction)
         engulf = self.reversal.engulfing_reversal(zone_candidates, base_direction, tick_volume, ats_short)
         buffer = self.reversal.reversal(self.reversal_buffer, direction, tick_volume, ats)
-
+        breakout=self.false_break_aware(tick_volume,atr,ats_short)
         # Determine zone price from extreme candle
         zone_price = self.get_extreme_zone(zone_candidates, direction)
-
+        label = "lows" if direction == "up" else "highs"
+        zone_clustered_recent = self.is_clustered_zone_recent(label)
         # If any reversal confirmed
-        if wick or pullback or engulf or buffer:
-            label = "lows" if direction == "up" else "highs"
+        if (wick or pullback or engulf or buffer or breakout) and not zone_clustered_recent:
             timestamp = datetime.now().isoformat()
             volume_ratio = tick_volume / atv
             size_ratio = size / ats
@@ -622,7 +643,6 @@ class SRManager:
 
             if label not in self.reversal_zones:
                 self.reversal_zones[label] = []
-
             self.reversal_zones[label].append({
                 "price": zone_price,
                 "timestamp": timestamp,
@@ -632,7 +652,7 @@ class SRManager:
                 "tick_volume": tick_volume,
                 "size": size,
                 "atr": atr,
-                "type": self.get_reversal_type(wick, pullback, engulf, buffer)
+                "type": self.get_reversal_type(wick, pullback, engulf, buffer,breakout)
             })
 
             return f"reversal_{direction} and tick_volume: {round(tick_volume,2)} vs atv: {round(atv,2)} and size: {size:.2f} vs ats: {ats:.2f} vs atr: {atr:.2f} and price: {price}, strength indx: {strength_index:.2f}, size_ratio: {size_ratio:.2f}, atr_ats_ratio: {atr_ats_ratio:.2f}"
@@ -640,7 +660,7 @@ class SRManager:
         return None
 
 
-    def get_reversal_type(self, wick, pullback, engulf, buffer):
+    def get_reversal_type(self, wick, pullback, engulf, buffer,breakout):
         if engulf:
             return "engulfing"
         elif wick:
@@ -649,6 +669,10 @@ class SRManager:
             return "pullback"
         elif buffer:
             return "buffer"
+        elif wick and pullback:
+            return "wick_pullback"
+        elif breakout:
+            return "false_break"
         return "unknown"
 
     def depopularize(self,atr):
@@ -694,26 +718,17 @@ class SRManager:
         recent_size = abs(recent_close - recent_open)
         direction="up" if recent_close>recent_open else "down"
         ts=datetime.now().strftime("%Y-%m-%d %H:%M")
-        label="lows" if recent_close>recent_open else "highs"
-        zone_price= float(recent_candle["low"]) if direction=="up" else float(recent_candle["high"])
 
         if net_move < ats_short*1.2 <= recent_size <= 0.9*atr:
-            self.reversal_zones[label].append({
-                "price": zone_price,
-                "timestamp": ts
-            })
+
             self.prev_false_break.append({
                 "timestamp": ts,
                 "up": 1 if direction == "up" else 0,
                 "down": 1 if direction == "down" else 0
             })
 
-            return f"⚠️ Possible {direction} false break  recent size: {recent_size:.2f} vs atr:{atr:.2f} and tick_volume: {tick_volume:.2f}"
+            return f"⚠️ Possible {direction} false break  recent size: {recent_size:.2f} vs atr:{atr:.2f} and tick_volume: {tick_volume}"
         if net_move<=ats_short*1.2 and recent_size>0.9*atr:
-            self.reversal_zones[label].append({
-                "price": zone_price,
-                "timestamp": ts
-            })
 
             self.consolidation_break.append({
                 "timestamp": ts,
