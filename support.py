@@ -116,3 +116,184 @@ class AlertLogger:
                 print("[ERROR] All retries failed. Falling back to Telegram.")
 
         send_telegram_alert(full)
+class Reversal:
+    def __init__(self):
+        self.consolidation_count = 0
+        self.last_consolidation = None
+        self.consolidation_triggered=False
+
+    def get_wicks(self, candle):
+        open_, close = float(candle["open"]), float(candle["close"])
+        high, low = float(candle["high"]), float(candle["low"])
+
+        if close < open_:
+            upper_wick = high - open_
+            lower_wick = close - low
+        elif close > open_:
+            upper_wick = high - close
+            lower_wick = low - open_
+        else:
+            print("neutral candle - no wicks")
+            return 0, 0
+        return upper_wick, lower_wick
+
+
+    def is_wick_reversal(self, candle, next_two,base_direction,tick_volume,ats_short,next1_direction):
+        if base_direction not in ["up", "down"] :
+            return None
+        upper, lower = self.get_wicks(candle)
+        if upper and lower is None:
+            print("🚫 Invalid candle data for upward reversal check.")
+            return None
+        sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
+        directions_up = [float(c["close"]) > float(c["open"]) for c in next_two]
+        direction_down = [float(c["close"]) < float(c["open"]) for c in next_two]
+
+        if lower >upper and all(directions_up) and base_direction=="down" and next1_direction=="down" and any(s >= 0.7*ats_short for s in sizes):
+            close_curr = float(next_two[-1]["close"])
+            lows = [float(c["low"]) for c in next_two]
+            size = round(close_curr - min(lows), 2)
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+            return f"🔺 Upward Reversal (wick) at {ts}, size: ${size} and tick_volume: {tick_volume}"
+        if upper > lower and all(direction_down) and base_direction == "up" and next1_direction=="up" and any(s >= ats_short for s in sizes):
+            high = float(candle["high"])
+            close_last = float(next_two[-1]["close"])
+            size = round(high - close_last, 2)
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+            return f"🔻 Downward Reversal (wick) at {ts}, size: ${size} and tick_volume: {tick_volume}"
+        return None
+
+    def is_pullback_reversal(self,next_two,base_direction,tick_volume,ats_short,next1_direction):
+        if base_direction not in ["up", "down"] :
+            return None
+        sizes = [abs(float(c["close"]) - float(c["open"])) for c in next_two]
+        directions = [float(c["close"]) < float(c["open"]) for c in next_two] if base_direction == "up" else \
+                     [float(c["close"]) > float(c["open"]) for c in next_two]
+
+        if all(directions) and any(s >=0.5*ats_short for s in sizes) and next1_direction==base_direction:
+            ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+            if base_direction == "up":
+                close_last = float(next_two[-1]["close"])
+                high = max(float(c["high"]) for c in next_two)
+                size = round(high - close_last, 2)
+                return f"🔻 Pullback Reversal (Down) at {ts}, size: ${size} and tick_volume: {tick_volume}"
+            else:
+                close_last = float(next_two[-1]["close"])
+                low = min(float(c["low"]) for c in next_two)
+                size = round(close_last - low, 2)
+                return f"🔺 Pullback Reversal (Up) at {ts}, size: ${size} and tick_volume: {tick_volume}"
+        return None
+
+    def engulfing_reversal(self, last_three, base_direction,tick_volume,ats_short):
+        """
+        Detects bullish or bearish engulfing reversal based on last three candles and base direction.
+        Returns a formatted string if reversal is detected, else None.
+        """
+
+        if len(last_three) != 3:
+            return None  # Ensure exactly three candles are passed
+
+        c1, c2, c3 = last_three  # c1 = next1, c2 = next2, c3 = next3
+
+        # Direction helpers
+        def is_up(c):
+            return float(c["close"]) > float(c["open"])
+
+        def is_down(c):
+            return float(c["close"]) < float(c["open"])
+
+        def body_size(c):
+            return abs(float(c["close"]) - float(c["open"]))
+
+        # Sizes
+        size_c2 = body_size(c2)
+        size_c3 = body_size(c3)
+
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        # 🔻 Bearish Engulfing Reversal
+        if base_direction == "up" and is_up(c1) and is_up(c2) and is_down(c3):
+            if size_c3 > size_c2 and size_c3 >= 1.5*ats_short:
+                return f"🔻 Bearish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
+
+        # 🔺 Bullish Engulfing Reversal
+        if base_direction == "down" and is_down(c1) and is_down(c2) and is_up(c3):
+            if size_c3 > size_c2 and size_c3 >=1.5*ats_short:
+                return f"🔺 Bullish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
+
+        return None
+
+    def reversal(self, store_candle, recent_direction, tick_volume,ats):
+        if len(store_candle) < 5:
+            print("🚫 Not enough candles to evaluate reversal.")
+            return None
+
+        base, next1, next2, next3, next4 = store_candle[-5:]
+
+        try:
+            # Direction and size calculations
+            candles = [base, next1, next2, next3, next4]
+            directions = []
+            sizes = []
+
+            for i, candle in enumerate(candles):
+                open_price = float(candle["open"])
+                close_price = float(candle["close"])
+                direction = "up" if close_price > open_price else "down"
+                size = abs(close_price - open_price)
+                directions.append(direction)
+                sizes.append(size)
+
+            # Override direction for most recent candle
+            directions[-1] = recent_direction
+
+            # Shared size metric for output
+            total_size = abs(float(next4["close"]) - float(next1["close"]))
+
+        except (KeyError, TypeError, ValueError):
+            print("🚫 Invalid candle structure or non-numeric values.")
+            return None
+
+        # ATR-based downward reversal
+        if (
+                directions[0] == "down" and sizes[0] >= 0.5*ats and
+                directions[1] == "down" and sizes[1] >= 0.5*ats and
+                directions[2] == "up" and sizes[2] >= 1.5*ats and
+                directions[3] == "down" and sizes[3] >= 0.1*ats and
+                directions[4] == "down" and sizes[4] >= 0.5*ats
+        ):
+            return f"🔽  downward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
+
+        # ATR-based upward reversal
+        if (
+                directions[0] == "up" and sizes[0] >=0.5 and
+                directions[1] == "up" and sizes[1] >= 0.5 and
+                directions[2] == "down" and sizes[2] >= 4 and
+                directions[3] == "up" and sizes[3] >=0.1 and
+                directions[4] == "up" and sizes[4] >= 0.5
+        ):
+            return f"🔼  upward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
+
+        # Legacy pattern (optional fallback)
+        if (
+                directions[0] == "down" and
+                directions[1] == "down" and
+                directions[2] == "up" and
+                directions[3] == "down" and
+                directions[4] == "up" and
+                sizes[4] >= 3
+        ):
+            return f"🔼 legacy upward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
+
+        if (
+                directions[0] == "up" and
+                directions[1] == "up" and
+                directions[2] == "down" and
+                directions[3] == "up" and
+                directions[4] == "down" and
+                sizes[4] >= 3
+        ):
+            return f"🔽 legacy downward reversal detected size: ${round(total_size, 2)} and tick_volume: {tick_volume}"
+
+        return None
+

@@ -51,6 +51,58 @@ def get_xauusd_15min_candles(max_retries=3, delay_seconds=3):
     print("❌ All retries failed — no valid candle retrieved.")
     return None
 
+def get_xauusd_4hr_candles(max_retries=3, delay_seconds=3):
+    symbol = "XAUUSD"
+    timeframe = mt5.TIMEFRAME_H4  # 4-hour timeframe
+    num_candles = 3  # Fetch 3 candles including the current forming one
+
+    for attempt in range(1, max_retries + 1):
+        print(f"🛠️ Attempt {attempt} ➝ Initializing MetaTrader 5")
+        try:
+            if not mt5.initialize():
+                raise RuntimeError(f"MT5 init failed ➝ {mt5.last_error()}")
+            print("✅ MetaTrader 5 initialized successfully.")
+
+            if not mt5.symbol_select(symbol, True):
+                raise RuntimeError(f"Symbol selection failed ➝ {mt5.last_error()}")
+
+            # Fetch 3 candles starting from the current forming one
+            candles = mt5.copy_rates_from_pos(symbol, timeframe, 0, num_candles)
+
+            mt5.shutdown()
+
+            if candles is None or len(candles) < num_candles:
+                raise ValueError("Insufficient candle data retrieved.")
+
+            # Format all 3 candles
+            formatted_candles = []
+            for i, candle in enumerate(candles):
+                open_ = candle['open']
+                close = candle['close']
+                size = close - open_
+                volume = candle['tick_volume']
+                timestamp = datetime.fromtimestamp(candle['time']).isoformat()
+
+                print(f"🕯️ 4hr Candle {i+1} ➝ Open: {open_}, Close: {close}, Size: {size:.2f}, Volume: {volume}, Time: {timestamp}")
+
+                formatted_candles.append({
+                    "open": open_,
+                    "close": close,
+                    "high": candle['high'],
+                    "low": candle['low'],
+                    "tick_volume": volume,
+                    "timestamp": timestamp
+                })
+
+            return formatted_candles
+
+        except Exception as e:
+            print(f"⚠️ Error ➝ {e}")
+            if attempt < max_retries:
+                time.sleep(delay_seconds)
+
+    print("❌ All retries failed — no valid candle retrieved.")
+    return None
 
 def get_xauusd_init_data(max_retries=3, delay_seconds=3):
     for attempt in range(1, max_retries + 1):

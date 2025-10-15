@@ -1,11 +1,6 @@
-import socket
-import traceback
-from ctypes.wintypes import SMALL_RECT
+from Feed import get_xauusd_4hr_candles
 
-from Logic import SRManager, Reversal
-from datetime import datetime
-
-from support import AlertLogger
+from support import AlertLogger,Reversal
 
 
 class Trend:
@@ -14,7 +9,8 @@ class Trend:
         self.server=server
         self.log=AlertLogger(server.conn)
         self.sr=server.sr
-    def start_signal(self, atr):
+        self.trend="Uknown"
+    def start_signal(self, atr,direction):
         print("🔔 Starting trend analysis...")
         try:
             highs = self.sr.reversal_zones.get("highs", [])
@@ -35,7 +31,6 @@ class Trend:
             }
             if zones :
                 print(f"🔍 Analyzing zones and ATR={atr}:")
-                print("🔍 Constructed Zones:")
                 for label, zone in zones.items():
                     ts = zone.get("timestamp", "⛔️ No timestamp")
                     price = zone.get("price", "⛔️ No price")
@@ -54,8 +49,8 @@ class Trend:
                     return False
 
             # Define the sequences
-            sec1_keys = ["prev2_low", "prev1_high", "prev1_low", "curr_high", "curr_low"]
-            sec2_keys = ["prev2_high", "prev1_low", "prev1_high", "curr_low", "curr_high"]
+            sec1_keys = ["curr_high", "curr_low"]
+            sec2_keys = ["curr_low", "curr_high"]
 
             # Evaluate both sequences safely
             sec1 = safe_chain(sec1_keys)
@@ -71,7 +66,13 @@ class Trend:
                  self.v_lows(zones, atr, sec1) or \
                  self.ascending_m(zones, atr, sec1)
             if msg:
-                self.log.log(f"🔔 *Trend Signal*: `{msg}`")
+                if direction=="up" and self.sr.signal_flag==True:
+                 self.log.log(f"🔔 buy*Trend Signal*: `{msg}`")
+                 self.sr.signal_flag=False
+                elif direction=="down" and self.sr.signal_flag==True:
+                 self.log.log(f"🔔 sell*Trend Signal*: `{msg}`")
+                 self.sr.signal_flag=False
+                else :print(f"🔔 Trend detected: {msg}")
             else:
                 print("🔍 No trend detected.")
             return False, False
@@ -82,7 +83,69 @@ class Trend:
             self.log.log(f"⚠️ *Error in start_signal*: `{e}`")
             return False, False
 
+    def update_trend(self, new_trend):
+        assert new_trend in {"uptrend", "downtrend", "ranging", "unknown"}, "Invalid trend value"
+        self.trend = new_trend
+        print(f"🔄 Trend updated to: {new_trend}")
+    def init_trend(self):
+        candles = get_xauusd_4hr_candles()
+        if candles is None or len(candles) < 3:
+            print("❌ Failed to fetch initial candles for trend determination.")
+            return "unknown"
 
+        try:
+            highs = [candle['high'] for candle in candles]
+            lows = [candle['low'] for candle in candles]
+
+            if highs[2] > highs[1] > highs[0] and lows[2] > lows[1] > lows[0]:
+                self.trend = "uptrend"
+            elif highs[2] < highs[1] < highs[0] and lows[2] < lows[1] < lows[0]:
+                self.trend = "downtrend"
+            else:
+                self.trend = "ranging"
+            self.calculate_overlap_percentages(candles)
+            print(f"✅ Initial trend determined: {self.trend}")
+            return self.trend
+
+        except Exception as e:
+            print(f"⚠️ Error determining initial trend: {e}")
+            return "unknown"
+
+    def calculate_overlap_percentages(self, candles):
+        if len(candles) < 3:
+            raise ValueError("Need at least 3 candles to calculate overlaps.")
+
+        def overlap_percentage(c1, c2):
+            overlap_low = max(c1['low'], c2['low'])
+            overlap_high = min(c1['high'], c2['high'])
+
+            if overlap_low >= overlap_high:
+                return 0.0
+
+            overlap_size = overlap_high - overlap_low
+            range1 = c1['high'] - c1['low']
+            range2 = c2['high'] - c2['low']
+            avg_range = (range1 + range2) / 2
+
+            return round((overlap_size / avg_range) * 100, 2)
+
+        latest = candles[-1]
+        prev1 = candles[-2]
+        prev2 = candles[-3]
+        latest_prev1_overlap = overlap_percentage(latest, prev1)
+        prev1_prev2_overlap = overlap_percentage(prev1, prev2)
+        latest_prev2_overlap = overlap_percentage(latest, prev2)
+        print(
+            f"🔍 Overlap Percentages:\n"
+            f"Latest vs Prev1 ➝ {latest_prev1_overlap:.2f}%\n"
+            f"Prev1 vs Prev2 ➝ {prev1_prev2_overlap:.2f}%\n"
+            f"Latest vs Prev2 ➝ {latest_prev2_overlap:.2f}%"
+        )
+        return {
+            "latest_vs_prev1": latest_prev1_overlap,
+            "prev1_vs_prev2": prev1_prev2_overlap,
+            "latest_vs_prev2": latest_prev2_overlap
+        }
     def classic_uptrend(self, zones, atr, sec1):
         try:
             curr_high = zones["curr_high"]["price"]
@@ -91,11 +154,11 @@ class Trend:
             prev1_low = zones["prev1_low"]["price"]
             prev2_low = zones["prev2_low"]["price"]
 
-            higher_high = curr_high > prev1_high + 0.1 * atr
-            higher_low = curr_low > prev1_low + 0.1 * atr and prev1_low > prev2_low
+            higher_high = curr_high > prev1_high
+            higher_low = curr_low > prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if higher_high and higher_low and swing_size and sec1:
+            if higher_high and higher_low and swing_size and sec1 :
                 return "📈 Classic Uptrend detected: Higher Highs and Higher Lows"
             return False
 
@@ -112,8 +175,8 @@ class Trend:
             curr_low = zones["curr_low"]["price"]
             prev1_low = zones["prev1_low"]["price"]
 
-            higher_high = curr_high > prev1_high + 0.1 * atr and prev1_high > prev2_high
-            lower_low = curr_low <prev1_low + 0.1 * atr
+            higher_high = curr_high > prev1_high > prev2_high
+            lower_low = curr_low <prev1_low
             swing_size = (curr_high - curr_low) >= atr
             if higher_high and lower_low and swing_size and sec2:
                 return "📈 Sell Expansion trend detected: Higher Highs and Lower Lows"
@@ -128,8 +191,8 @@ class Trend:
             curr_low = zones["curr_low"]["price"]
             prev1_low = zones["prev1_low"]["price"]
 
-            higher_high = curr_high > prev1_high + 0.1 * atr
-            lower_low = curr_low > prev1_low + 0.1 * atr and prev1_low <prev2_low
+            higher_high = curr_high > prev1_high
+            lower_low = curr_low > prev1_low and prev1_low <prev2_low
             swing_size = (curr_high - curr_low) >= atr
             if higher_high and lower_low and swing_size and sec1:
                 return "📈 Buy Expansion trend detected: higher Highs and Higher Lows"
@@ -145,11 +208,11 @@ class Trend:
             prev1_low = zones["prev1_low"]["price"]
             prev2_low = zones["prev2_low"]["price"]
 
-            lower_high = curr_high < prev1_high - 0.1 * atr
-            higher_low = curr_low > prev1_low + 0.1 * atr and prev1_low > prev2_low
+            lower_high = curr_high < prev1_high
+            higher_low = curr_low > prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if lower_high and higher_low and swing_size and sec1:
+            if lower_high and higher_low and swing_size and sec1 :
                 return "📉 Contraction trend detected: Lower Highs and Higher Lows"
             return False
 
@@ -164,7 +227,7 @@ class Trend:
             prev2_low = zones["prev2_low"]["price"]
 
             equal_high = curr_high - prev1_high <=0.4 * atr
-            higher_low = curr_low > prev1_low + 0.1 * atr and prev1_low > prev2_low
+            higher_low = curr_low > prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.2 * atr
             if equal_high and higher_low and swing_size and sec1:
                 return "🔺 Ascending Triangle detected: Flat Highs and Rising Lows"
@@ -180,9 +243,9 @@ class Trend:
             prev1_low = zones["prev1_low"]["price"]
 
             equal_high = curr_high - prev1_high <= 0.4 * atr
-            lower_low = curr_low < prev1_low + 0.1 * atr and prev1_low > prev2_low
+            lower_low = curr_low < prev1_low and prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= atr
-            if equal_high and lower_low and swing_size and sec1:
+            if equal_high and lower_low and swing_size and sec1 :
                 return "🔻 Descending Midpoint detected: Flat Highs and Falling Lows"
             return False
         except KeyError:
@@ -197,11 +260,11 @@ class Trend:
             prev1_high = zones["prev1_high"]["price"]
             prev2_high = zones["prev2_high"]["price"]
 
-            lower_low = curr_low < prev1_low - 0.1 * atr
-            lower_high = curr_high < prev1_high - 0.1 * atr and prev1_high < prev2_high
+            lower_low = curr_low < prev1_low
+            lower_high = curr_high < prev1_high < prev2_high
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if lower_low and lower_high and swing_size and sec2:
+            if lower_low and lower_high and swing_size and sec2 :
                 return "📉 Classic Downtrend detected: Lower Highs and Lower Lows"
             return False
 
@@ -215,7 +278,7 @@ class Trend:
             curr_low = zones["curr_low"]["price"]
             prev1_low = zones["prev1_low"]["price"]
 
-            higher_high = curr_high < prev1_high + 0.3 * atr and prev1_high > prev2_high
+            higher_high = curr_high < prev1_high  and prev1_high > prev2_high
             higher_low = (curr_low -prev1_low )<= atr
             swing_size = (curr_high - curr_low) >= 0.5 * atr
             if higher_high and higher_low and swing_size and sec2:
@@ -231,8 +294,8 @@ class Trend:
             prev1_low = zones["prev1_low"]["price"]
             prev2_low = zones["prev2_low"]["price"]
 
-            lower_high = curr_high < prev1_high + 0.1* atr
-            lower_low = prev1_low - 0.2 * atr < curr_low < prev2_low and prev1_low < prev2_low
+            lower_high = curr_high < prev1_high
+            lower_low = prev1_low < curr_low < prev2_low and prev1_low < prev2_low
             swing_size = (curr_high - curr_low) >= atr
 
             if lower_high and lower_low and swing_size and sec1:
@@ -249,8 +312,8 @@ class Trend:
             prev1_low = zones["prev1_low"]["price"]
             prev2_low = zones["prev2_low"]["price"]
 
-            higher_high = curr_high > prev1_high + 0.1 * atr
-            higher_low = curr_low< prev1_low + 0.1 * atr and prev1_low > prev2_low
+            higher_high = curr_high > prev1_high
+            higher_low = curr_low< prev1_low  and prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.8 * atr
             if higher_high and higher_low and swing_size and sec1:
                 return "🚩 buy Ascending M detected"

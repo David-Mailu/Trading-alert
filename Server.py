@@ -2,15 +2,39 @@ import socket, time,threading
 from datetime import datetime, timedelta
 import bot
 from Feed import get_xauusd_init_data
-from Logic import Reversal, SRManager
-from support import MarketSchedule, CandleFetcher, AlertLogger
+from Logic import  SRManager
+from support import MarketSchedule, CandleFetcher, AlertLogger, Reversal
 from bot import  sr_config, send_telegram_alert, start_bot
 from Signals import Trend
 # 🧠 Smart Alert Server
 class SmartServer:
+
     def get_status_payload(self):
-        payload=self.sr.get_status_payload()
-        return payload if payload else "⚠️ *No status data available.*"
+        status ="🟢 active" if self.paused==False else "🔴 paused"
+
+        sr_configuration = {
+            "tolerance": self.sr.tolerance,
+            "support": self.sr.support,
+            "resistance": self.sr.resistance,
+            "resistance_liquidity": self.sr.resistance_liquidity,
+            "support_liquidity": self.sr.support_liquidity
+        }
+        tolerance = sr_configuration["tolerance"]
+        support = sr_configuration["support"]
+        resistance = sr_configuration["resistance"]
+        resistance_liquidity = sr_configuration["resistance_liquidity"]
+        support_liquidity = sr_configuration["support_liquidity"]
+
+        payload = (
+            f"📊 *System Status*\n"
+            f"- Alerts: {status}\n"
+            f"- Tolerance: `{tolerance}`\n"
+            f"- Support Zones: `{', '.join(map(str, support)) or 'None'}`\n"
+            f"- Resistance Zones: `{', '.join(map(str, resistance)) or 'None'}`\n"
+            f"- Resistance Liquidity Zones: `{', '.join(map(str, resistance_liquidity)) or 'None'}`\n"
+            f"- Support Liquidity Zones: `{', '.join(map(str, support_liquidity)) or 'None'}`\n"
+        )
+        return payload if payload else "⚠️ No data available."
 
     def pause(self):
         self.paused = True
@@ -84,6 +108,7 @@ class SmartServer:
                   print(f"📈 Previous direction: {direction}")
                   print(f"💡 Previous candle size: {size}")
                   self.sr.get_candle_stats()
+                  self.signal.init_trend()
 
                 self.sr.init_reversal_zones()
                 return True
@@ -110,6 +135,7 @@ class SmartServer:
         self.signal = Trend(self)
         self.log = AlertLogger(self.conn)
         self.reversal = Reversal()
+        self.recent_init=datetime.now()
     def start(self):
         if not self.initialize():
             return
@@ -128,10 +154,8 @@ class SmartServer:
                 candle = self.fetcher.pull()
                 if not candle:
                     continue
-                atr=self.sr.start_logic(candle)
-                if atr :
-                    print(f"server ATR: {atr}")
-                self.signal.start_signal(atr)
+                atr,direction=self.sr.start_logic(candle)
+                self.signal.start_signal(atr,direction)
 
                 if datetime.now().hour == 0 and datetime.now().minute == 0:
                     self.reset_state(sr_config)
