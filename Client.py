@@ -38,13 +38,35 @@ def listen_for_alerts(socket_obj):
                 log_file.write(formatted + "\n")
     except KeyboardInterrupt:
         print("🛑 Interrupted by user.")
+        raise  # Let outer loop handle shutdown
     except Exception as e:
         print(f"💥 Unexpected error: {e}")
     finally:
         print("🔌 Closing client socket...")
-        socket_obj.close()
+        try:
+            socket_obj.close()
+        except:
+            pass
+
+def persistent_client():
+    while True:
+        client_socket = connect_to_server()
+        if not client_socket:
+            print("🛑 Giving up after timeout.")
+            break
+
+        try:
+            listen_for_alerts(client_socket)
+        except KeyboardInterrupt:
+            print("🛑 Client shutdown requested.")
+            break
+        except Exception as e:
+            print(f"⚠️ Listener error: {e}. Reconnecting in 5s...")
+            time.sleep(5)
+            continue
 
 if __name__ == "__main__":
-    client_socket = connect_to_server()
-    if client_socket:
-        listen_for_alerts(client_socket)
+    try:
+        persistent_client()
+    except KeyboardInterrupt:
+        print("🛑 Client terminated by user.")

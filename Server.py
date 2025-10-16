@@ -1,5 +1,8 @@
 import socket, time,threading
 from datetime import datetime, timedelta
+
+from telebot.apihelper import MAX_RETRIES
+
 import bot
 from Feed import get_xauusd_init_data
 from Logic import  SRManager
@@ -118,7 +121,8 @@ class SmartServer:
 
         print("❌ Initialization failed after retries.")
         return False
-    def __init__(self, debug=False):
+    def __init__(self, debug=False,shutdown_event=None):
+        self.shutdown_event = shutdown_event
         self.debug = debug
         self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         self.sock.bind(('::1', 65432))
@@ -127,7 +131,7 @@ class SmartServer:
         self.conn, addr = self.sock.accept()
         print(f"🔗 Connected to {addr}")
 
-        self.market = MarketSchedule(debug=debug)
+        self.market = MarketSchedule(debug=debug,shutdown_event=shutdown_event)
         self.paused = False
         self.paused_state = False
         self.fetcher = CandleFetcher()
@@ -140,22 +144,34 @@ class SmartServer:
         if not self.initialize():
             return
         try:
-            while True:
+            while not self.shutdown_event.is_set():
                 if self.paused:
                     if not self.paused_state:
                      print("🔕 Server paused. Waiting for resume...")
                     self.paused_state=True
-                    time.sleep(1)
+                    if self.shutdown_event.wait(timeout=1):
+                        print("Shutdown event detected during pause.")
+                        break
                     continue
                 else:
                     self.paused_state=False
-                self.market.wait_next_quarter()
-                # ⏰ Local time-based reset at midnight
-                candle = self.fetcher.pull()
-                if not candle:
-                    continue
-                atr,direction=self.sr.start_logic(candle)
-                self.signal.start_signal(atr,direction)
+                try:
+                    if not self.market.wait_next_quarter():
+                        print("Wait next quarter returned false.")
+                        self.log.log("server wait_next_quarter returned false")
+                        return
+
+                    candle = self.fetcher.pull()
+                    if not candle:
+                        return
+
+                    atr, direction = self.sr.start_logic(candle)
+                    self.signal.start_signal(atr, direction)
+
+                except Exception as e:
+                    print(f"💥 Crash after wait_next_quarter: {e}")
+                    self.log.log(f"💥 Crash after wait_next_quarter: {e}")
+                    raise  # Let it bubble up to trigger orchestrator restart
 
                 if datetime.now().hour == 0 and datetime.now().minute == 0:
                     self.reset_state(sr_config)
@@ -170,19 +186,81 @@ class SmartServer:
             print("🛑 Server interrupted.")
         except Exception as e:
             print(f"💥 Uncaught error: {e}")
-            send_telegram_alert(f"⚠️ *Server error:* `{e}`")
             self.log.log(f"⚠️ *Server error:* `{e}`")
         finally:
             print("🔌 Closing server...")
             self.conn.close()
             self.sock.close()
 
+def run_server():
+    try:
+        server.start()
+    except Exception as e:
+        print(f"🚨 Fatal error in server loop: {e}")
+        send_telegram_alert(f"🚨 Server crashed: `{e}`")
+
+def run_bot():
+    try:
+        start_bot()
+    except Exception as e:
+        print(f"🤖 Bot error: {e}")
+        send_telegram_alert(f"⚠️ Bot crashed: `{e}`")
+
 # 🏁 Entrypoint
 if __name__ == "__main__":
+    MAX_RETRIES=3
+    DELAY_SECONDS=5
+    bot_retries=0
+    server_retries=0
+    shutdown_event = threading.Event()
+    shutdown_event.clear()
     try:
-        server = SmartServer(debug=False)
+        server = SmartServer(debug=False,shutdown_event=shutdown_event)
         bot.server_instance = server
-        threading.Thread(target=start_bot, daemon=True).start()
-        server.start()
+
+        server_thread = threading.Thread(target=run_server, daemon=True)
+        bot_thread = threading.Thread(target=run_bot, daemon=True)
+
+        server_thread.start()
+        bot_thread.start()
+
+        while True:
+            if shutdown_event.is_set():
+                print("Shutdown event detected. Exiting orchestrator loop.")
+                break
+            if not server_thread.is_alive():
+                if shutdown_event.is_set():
+                    print("Shutdown event detected. Not restarting server thread.")
+                    break
+                server_retries+=1
+                if server_retries > MAX_RETRIES:
+                    print("🚨 Server failed to restart after max retries. Exiting...")
+                    send_telegram_alert("🚨 *Server failed to restart after max retries. Exiting...*")
+                    shutdown_event.set()
+                    break
+                print("🚨 Server thread crashed.")
+                send_telegram_alert("🚨 *Server thread crashed. Restarting...*")
+                server_thread = threading.Thread(target=run_server, daemon=True)
+                server_thread.start()
+                time.sleep(DELAY_SECONDS)
+            if not bot_thread.is_alive():
+                if shutdown_event.is_set():
+                    print("Shutdown event detected. Not restarting bot thread.")
+                    break
+                bot_retries+=1
+                if bot_retries > MAX_RETRIES:
+                    print("🚨 Bot failed to restart after max retries. Exiting...")
+                    send_telegram_alert("🚨 *Bot failed to restart after max retries. Exiting...*")
+                    shutdown_event.set()
+                    break
+                print("🚨 Bot thread crashed.")
+                send_telegram_alert("🚨 *Bot thread crashed. Restarting...*")
+                bot_thread = threading.Thread(target=run_bot, daemon=True)
+                bot_thread.start()
+                time.sleep(DELAY_SECONDS)
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        print("🛑 Ctrl+C received. Shutting down...")
     except Exception as e:
         print(f"🚨 Fatal error in orchestrator: {e}")

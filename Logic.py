@@ -65,12 +65,14 @@ class SRManager:
                 baze_direction = "up" if float(base["close"]) > float(base["open"]) else "down" if float(base["close"]) < float(base["open"]) else None
                 next1_size = (float(next1["close"]) - float(next1["open"]))
                 next1_direction = "up" if float(next1["close"]) > float(next1["open"]) else "down" if float(next1["close"]) < float(next1["open"]) else None
+                base0_base_size=base0_size+base_size
+                base_next1_size=base_size+next1_size
                 effective_size=base0_size+base_size+next1_size
                 same_dir_base0_next1=(base0_direction==next1_direction) and base0_direction is not None
                 same_dir_base_next1=(baze_direction==next1_direction) and baze_direction is not None
-                if effective_size>=0.1  and (same_dir_base0_next1 or same_dir_base_next1):
+                if (effective_size>=0.2*atr or base0_base_size>=0.4*atr or base_next1_size>=0.4*atr)  and (same_dir_base0_next1 or same_dir_base_next1):
                     base_direction = "up"
-                elif effective_size<=-0.1 and (same_dir_base0_next1 or same_dir_base_next1):
+                elif (effective_size>=-0.2*atr or base0_base_size>=-0.4*atr or base_next1_size>=-0.4*atr) and (same_dir_base0_next1 or same_dir_base_next1):
                     base_direction = "down"
                 else:
                     base_direction=self.prev_base_direction

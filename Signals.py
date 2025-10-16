@@ -158,7 +158,7 @@ class Trend:
             higher_low = curr_low > prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if higher_high and higher_low and swing_size and sec1 :
+            if higher_high and higher_low and swing_size:
                 return "📈 Classic Uptrend detected: Higher Highs and Higher Lows"
             return False
 
@@ -178,7 +178,7 @@ class Trend:
             higher_high = curr_high > prev1_high > prev2_high
             lower_low = curr_low <prev1_low
             swing_size = (curr_high - curr_low) >= atr
-            if higher_high and lower_low and swing_size and sec2:
+            if higher_high and lower_low and swing_size :
                 return "📈 Sell Expansion trend detected: Higher Highs and Lower Lows"
             return False
         except KeyError:
@@ -194,7 +194,7 @@ class Trend:
             higher_high = curr_high > prev1_high
             lower_low = curr_low > prev1_low and prev1_low <prev2_low
             swing_size = (curr_high - curr_low) >= atr
-            if higher_high and lower_low and swing_size and sec1:
+            if higher_high and lower_low and swing_size:
                 return "📈 Buy Expansion trend detected: higher Highs and Higher Lows"
             return False
         except KeyError:
@@ -212,7 +212,7 @@ class Trend:
             higher_low = curr_low > prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if lower_high and higher_low and swing_size and sec1 :
+            if lower_high and higher_low and swing_size :
                 return "📉 Contraction trend detected: Lower Highs and Higher Lows"
             return False
 
@@ -245,7 +245,7 @@ class Trend:
             equal_high = curr_high - prev1_high <= 0.4 * atr
             lower_low = curr_low < prev1_low and prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= atr
-            if equal_high and lower_low and swing_size and sec1 :
+            if equal_high and lower_low and swing_size :
                 return "🔻 Descending Midpoint detected: Flat Highs and Falling Lows"
             return False
         except KeyError:
@@ -264,7 +264,7 @@ class Trend:
             lower_high = curr_high < prev1_high < prev2_high
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if lower_low and lower_high and swing_size and sec2 :
+            if lower_low and lower_high and swing_size  :
                 return "📉 Classic Downtrend detected: Lower Highs and Lower Lows"
             return False
 
@@ -281,7 +281,7 @@ class Trend:
             higher_high = curr_high < prev1_high  and prev1_high > prev2_high
             higher_low = (curr_low -prev1_low )<= atr
             swing_size = (curr_high - curr_low) >= 0.5 * atr
-            if higher_high and higher_low and swing_size and sec2:
+            if higher_high and higher_low and swing_size :
                 return "🚩 sell Bull ears detected"
             return False
         except KeyError:
@@ -298,7 +298,7 @@ class Trend:
             lower_low = prev1_low < curr_low < prev2_low and prev1_low < prev2_low
             swing_size = (curr_high - curr_low) >= atr
 
-            if lower_high and lower_low and swing_size and sec1:
+            if lower_high and lower_low and swing_size :
                 return "📈 V-Lows detected possible buy: Sharp Reversal with lower Highs and Lower Lows"
             return False
 
@@ -315,7 +315,7 @@ class Trend:
             higher_high = curr_high > prev1_high
             higher_low = curr_low< prev1_low  and prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.8 * atr
-            if higher_high and higher_low and swing_size and sec1:
+            if higher_high and higher_low and swing_size :
                 return "🚩 buy Ascending M detected"
             return False
         except KeyError:

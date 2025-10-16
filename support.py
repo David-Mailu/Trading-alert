@@ -22,12 +22,16 @@ class MarketSchedule:
             next_time+= timedelta(days=1)
         # Add buffer to ensure candle finalization
         target_time = next_time + timedelta(seconds=buffer_seconds)
-        sleep = (target_time - now).total_seconds()
+        sleep_duration = (target_time - now).total_seconds()
 
-        print(f"⏳ Next run at {target_time.strftime('%H:%M:%S')} ({int(sleep)}s)")
-        time.sleep(sleep)
+        print(f"⏳ Next run at {target_time.strftime('%H:%M:%S')} ({int(sleep_duration)}s)")
+        if self.shutdown_event and self.shutdown_event.wait(timeout=sleep_duration):
+            print("🛑 Shutdown signal received during wait.")
+            return False
+        return True
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, shutdown_event=None):
+        self.shutdown_event = shutdown_event
         self.debug = debug
 
     def is_market_open(self):
