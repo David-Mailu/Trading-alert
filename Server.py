@@ -2,7 +2,7 @@ import socket, time,threading
 from datetime import datetime, timedelta
 
 from telebot.apihelper import MAX_RETRIES
-
+import schedule
 import bot
 from Feed import get_xauusd_init_data
 from Logic import  SRManager
@@ -59,6 +59,7 @@ class SmartServer:
             self.sr.resistance_liquidity.pop(0)
         print("🔗 Synced SR zones from remote config.")
 
+
     def reset_state(self,sr_config):
         print("Executing server reset...")
         try:
@@ -112,7 +113,7 @@ class SmartServer:
                   print(f"💡 Previous candle size: {size}")
                   self.sr.get_candle_stats()
                   self.signal.init_trend()
-
+                  self.signal.get_prev_pullbacks()
                 self.sr.init_reversal_zones()
                 return True
 
@@ -121,7 +122,7 @@ class SmartServer:
 
         print("❌ Initialization failed after retries.")
         return False
-    def __init__(self, debug=False,shutdown_event=None):
+    def __init__(self, debug=False,shutdown_event=None,signal=None):
         self.shutdown_event = shutdown_event
         self.debug = debug
         self.sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
@@ -136,7 +137,7 @@ class SmartServer:
         self.paused_state = False
         self.fetcher = CandleFetcher()
         self.sr = SRManager(self)
-        self.signal = Trend(self)
+        self.signal =signal if signal is not None else Trend(self)
         self.log = AlertLogger(self.conn)
         self.reversal = Reversal()
         self.recent_init=datetime.now()
@@ -205,44 +206,53 @@ def run_bot():
     except Exception as e:
         print(f"🤖 Bot error: {e}")
         send_telegram_alert(f"⚠️ Bot crashed: `{e}`")
+def hourly_trend_updater(shutdown_event, signal):
+    while not shutdown_event.is_set():
+        now = datetime.now()
+        seconds_until_next_hour = 3600 - (now.minute * 60 + now.second)
+        time.sleep(seconds_until_next_hour)
+
+        if shutdown_event.is_set():
+            print("🛑 Shutdown detected. Exiting trend updater.")
+            break
+
+        try:
+            signal.init_trend()  # This updates trend internally
+            print(f"[{datetime.now()}] 🔄 Trend refreshed via init_trend()")
+        except Exception as e:
+            print(f"⚠️ Trend update failed: {e}")
 
 # 🏁 Entrypoint
 if __name__ == "__main__":
     MAX_RETRIES=3
     DELAY_SECONDS=5
     bot_retries=0
-    server_retries=0
     shutdown_event = threading.Event()
     shutdown_event.clear()
     try:
         server = SmartServer(debug=False,shutdown_event=shutdown_event)
+        server.signal= Trend(server)
         bot.server_instance = server
 
         server_thread = threading.Thread(target=run_server, daemon=True)
         bot_thread = threading.Thread(target=run_bot, daemon=True)
-
+        trend_thread=threading.Thread(target=hourly_trend_updater,args=(shutdown_event,server.signal) ,daemon=True)
+        print("starting server")
         server_thread.start()
+        print("starting bot")
         bot_thread.start()
-
+        print("starting trend updater")
+        trend_thread.start()
         while True:
             if shutdown_event.is_set():
                 print("Shutdown event detected. Exiting orchestrator loop.")
                 break
             if not server_thread.is_alive():
-                if shutdown_event.is_set():
-                    print("Shutdown event detected. Not restarting server thread.")
-                    break
-                server_retries+=1
-                if server_retries > MAX_RETRIES:
-                    print("🚨 Server failed to restart after max retries. Exiting...")
-                    send_telegram_alert("🚨 *Server failed to restart after max retries. Exiting...*")
-                    shutdown_event.set()
-                    break
-                print("🚨 Server thread crashed.")
-                send_telegram_alert("🚨 *Server thread crashed. Restarting...*")
-                server_thread = threading.Thread(target=run_server, daemon=True)
-                server_thread.start()
-                time.sleep(DELAY_SECONDS)
+                print("🚨 Server thread crashed. Initiating shutdown.")
+                send_telegram_alert("🚨 *Server thread crashed. Shutting down everything...*")
+                shutdown_event.set()
+                break  # Exit loop immediately, no retries
+
             if not bot_thread.is_alive():
                 if shutdown_event.is_set():
                     print("Shutdown event detected. Not restarting bot thread.")

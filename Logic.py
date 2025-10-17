@@ -536,3 +536,27 @@ class SRManager:
             })
             return f"⚠️ Possible {direction} consolidation break  recent size: {recent_size:.2f} vs atr:{atr:.2f} and tick_volume: {tick_volume}"
         return None
+    def candle_pattern(self):
+        if len(self.store_candle)<3:
+            return None
+        base,next1,next2=self.store_candle[-3:]
+        base_type=self.reversal.candle_body_type(base)
+        next1_type=self.reversal.candle_body_type(next1)
+        next2_type=self.reversal.candle_body_type(next2)
+        if base_type=="maruboza" and next1_type=="doji" and next2_type=="maruboza":
+            return "morning_star" if float(base["close"])<float(next2["close"]) else "evening_star"
+        if next1_type=="maruboza" and next2_type=="maruboza":
+            if self.reversal.is_down(base) and self.reversal.is_down(next1) and self.reversal.is_up(next2) and self.reversal.size(next)>self.reversal.size(next1):
+                return "bearish_engulfing"
+            if self.reversal.is_up(base) and self.reversal.is_up(next1) and self.reversal.is_down(next2) and self.reversal.size(next2)>self.reversal.size(next1):
+                return "bullish_engulfing"
+            if self.reversal.is_down(next1) and self.reversal.is_up(next2) and self.reversal.size(next1)>self.reversal.size(next2):
+                return "bullish_pregnant"
+            if self.reversal.is_up(next1) and self.reversal.is_down(next2) and self.reversal.size(next2)>self.reversal.size(next1):
+                return "bearish_pregnant"
+        if base_type=="maruboza" and next1_type==("hammer","shooting_star") and next2_type=="maruboza":
+            if self.reversal.is_up(base) and self.reversal.is_down(next2) and next1_type=="shooting_star":
+                return "upper_rejection"
+            if self.reversal.is_down(base) and self.reversal.is_up(next2) and next1_type=="hammer":
+                return "lower_rejection"
+        return None

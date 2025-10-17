@@ -1,4 +1,4 @@
-from Feed import get_xauusd_4hr_candles
+from Feed import get_xauusd_4hr_candles, get_xauusd_1hr_candles
 
 from support import AlertLogger,Reversal
 
@@ -66,13 +66,12 @@ class Trend:
                  self.v_lows(zones, atr, sec1) or \
                  self.ascending_m(zones, atr, sec1)
             if msg:
-                if direction=="up" and self.sr.signal_flag==True:
+                if sec1 and self.sr.signal_flag==True:
                  self.log.log(f"🔔 buy*Trend Signal*: `{msg}`")
                  self.sr.signal_flag=False
-                elif direction=="down" and self.sr.signal_flag==True:
+                elif sec2 and self.sr.signal_flag==True:
                  self.log.log(f"🔔 sell*Trend Signal*: `{msg}`")
                  self.sr.signal_flag=False
-                else :print(f"🔔 Trend detected: {msg}")
             else:
                 print("🔍 No trend detected.")
             return False, False
@@ -83,10 +82,41 @@ class Trend:
             self.log.log(f"⚠️ *Error in start_signal*: `{e}`")
             return False, False
 
-    def update_trend(self, new_trend):
-        assert new_trend in {"uptrend", "downtrend", "ranging", "unknown"}, "Invalid trend value"
-        self.trend = new_trend
-        print(f"🔄 Trend updated to: {new_trend}")
+    def get_prev_pullbacks(self):
+        candles = get_xauusd_1hr_candles()  # or get_xauusd_4hr_candles() if you're using 4hr data
+        if not candles or len(candles) < 4:
+            print("❌ Not enough candles to compute pullbacks.")
+            return None
+
+        # Reverse to get base as oldest, next3 as most recent
+        base, next1, next2, next3 = candles[::-1]
+
+        try:
+            prev_pullback1 = next3["low"] - next2["high"]
+            prev_pullback2 = next2["low"] - next1["high"]
+            prev_pullback3 = next1["low"] - base["high"]
+            self.sr.support_liquidity.append(next1["low"])
+            self.sr.support_liquidity.append(next2["low"])
+            self.sr.support_liquidity.append(next3["low"])
+            self.sr.resistance_liquidity.append(next1["high"])
+            self.sr.resistance_liquidity.append(next2["high"])
+            self.sr.resistance_liquidity.append(base["high"])
+            result = {
+                "prev_pullback1": round(prev_pullback1, 2),
+                "prev_pullback2": round(prev_pullback2, 2),
+                "prev_pullback3": round(prev_pullback3, 2)
+            }
+
+            print(f"📉 Pullback Analysis:")
+            print(f"  • prev_pullback1 (next3.low - next2.high): {result['prev_pullback1']}")
+            print(f"  • prev_pullback2 (next2.low - next1.high): {result['prev_pullback2']}")
+            print(f"  • prev_pullback3 (next1.low - base.high): {result['prev_pullback3']}")
+
+            return result
+
+        except KeyError as e:
+            print(f"⚠️ Missing candle key: {e}")
+            return None
     def init_trend(self):
         candles = get_xauusd_4hr_candles()
         if candles is None or len(candles) < 3:
@@ -158,7 +188,7 @@ class Trend:
             higher_low = curr_low > prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if higher_high and higher_low and swing_size:
+            if higher_high and higher_low and swing_size and sec1:
                 return "📈 Classic Uptrend detected: Higher Highs and Higher Lows"
             return False
 
@@ -178,7 +208,7 @@ class Trend:
             higher_high = curr_high > prev1_high > prev2_high
             lower_low = curr_low <prev1_low
             swing_size = (curr_high - curr_low) >= atr
-            if higher_high and lower_low and swing_size :
+            if higher_high and lower_low and swing_size and sec2:
                 return "📈 Sell Expansion trend detected: Higher Highs and Lower Lows"
             return False
         except KeyError:
@@ -192,10 +222,10 @@ class Trend:
             prev1_low = zones["prev1_low"]["price"]
 
             higher_high = curr_high > prev1_high
-            lower_low = curr_low > prev1_low and prev1_low <prev2_low
+            lower_low = curr_low < prev1_low < prev2_low
             swing_size = (curr_high - curr_low) >= atr
-            if higher_high and lower_low and swing_size:
-                return "📈 Buy Expansion trend detected: higher Highs and Higher Lows"
+            if higher_high and lower_low and swing_size and sec1:
+                return "📈 Buy Expansion trend detected: higher Highs and lower Lows"
             return False
         except KeyError:
             return False
@@ -212,7 +242,7 @@ class Trend:
             higher_low = curr_low > prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if lower_high and higher_low and swing_size :
+            if lower_high and higher_low and swing_size and sec1:
                 return "📉 Contraction trend detected: Lower Highs and Higher Lows"
             return False
 
@@ -245,7 +275,7 @@ class Trend:
             equal_high = curr_high - prev1_high <= 0.4 * atr
             lower_low = curr_low < prev1_low and prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= atr
-            if equal_high and lower_low and swing_size :
+            if equal_high and lower_low and swing_size and sec1:
                 return "🔻 Descending Midpoint detected: Flat Highs and Falling Lows"
             return False
         except KeyError:
@@ -264,7 +294,7 @@ class Trend:
             lower_high = curr_high < prev1_high < prev2_high
             swing_size = (curr_high - curr_low) >= 0.5 * atr
 
-            if lower_low and lower_high and swing_size  :
+            if lower_low and lower_high and swing_size and sec2:
                 return "📉 Classic Downtrend detected: Lower Highs and Lower Lows"
             return False
 
@@ -281,7 +311,7 @@ class Trend:
             higher_high = curr_high < prev1_high  and prev1_high > prev2_high
             higher_low = (curr_low -prev1_low )<= atr
             swing_size = (curr_high - curr_low) >= 0.5 * atr
-            if higher_high and higher_low and swing_size :
+            if higher_high and higher_low and swing_size and sec2:
                 return "🚩 sell Bull ears detected"
             return False
         except KeyError:
@@ -298,7 +328,7 @@ class Trend:
             lower_low = prev1_low < curr_low < prev2_low and prev1_low < prev2_low
             swing_size = (curr_high - curr_low) >= atr
 
-            if lower_high and lower_low and swing_size :
+            if lower_high and lower_low and swing_size and sec1:
                 return "📈 V-Lows detected possible buy: Sharp Reversal with lower Highs and Lower Lows"
             return False
 
@@ -315,7 +345,7 @@ class Trend:
             higher_high = curr_high > prev1_high
             higher_low = curr_low< prev1_low  and prev1_low > prev2_low
             swing_size = (curr_high - curr_low) >= 0.8 * atr
-            if higher_high and higher_low and swing_size :
+            if higher_high and higher_low and swing_size and sec1:
                 return "🚩 buy Ascending M detected"
             return False
         except KeyError:

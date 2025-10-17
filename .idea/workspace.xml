@@ -4,9 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="added trend detection by fetching and calculating using last three four our candles, added a flag and direction filter for signal to prevent noise, made trend on compare current highs and lows only">
+    <list default="true" id="4ff6997b-d903-4e82-b5c0-284a4d9082ce" name="Changes" comment="i realized when running on cmd sometimes the server slept for too long or missed untill i nudge it so it was vital to find solution, i now use threading on server loop with gracefull shutdown">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Client.py" beforeDir="false" afterPath="$PROJECT_DIR$/Client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Feed.py" beforeDir="false" afterPath="$PROJECT_DIR$/Feed.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Logic.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Server.py" beforeDir="false" afterPath="$PROJECT_DIR$/Server.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Signals.py" beforeDir="false" afterPath="$PROJECT_DIR$/Signals.py" afterDir="false" />
@@ -72,7 +72,7 @@
     &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
   }
 }</component>
-  <component name="RunManager" selected="Python.Server">
+  <component name="RunManager" selected="Python.Client">
     <configuration name="Client" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Trading-alert" />
       <option name="ENV_FILES" value="" />
@@ -141,8 +141,8 @@
     </configuration>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.Server" />
         <item itemvalue="Python.Client" />
+        <item itemvalue="Python.Server" />
         <item itemvalue="Python.request" />
       </list>
     </recent_temporary>
@@ -426,7 +426,15 @@
       <option name="project" value="LOCAL" />
       <updated>1760546147046</updated>
     </task>
-    <option name="localTasksCounter" value="34" />
+    <task id="LOCAL-00034" summary="i realized when running on cmd sometimes the server slept for too long or missed untill i nudge it so it was vital to find solution, i now use threading on server loop with gracefull shutdown">
+      <option name="closed" value="true" />
+      <created>1760629412120</created>
+      <option name="number" value="00034" />
+      <option name="presentableId" value="LOCAL-00034" />
+      <option name="project" value="LOCAL" />
+      <updated>1760629412120</updated>
+    </task>
+    <option name="localTasksCounter" value="35" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -447,7 +455,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="tried refining logic, fell into server_instance challenge. i will solve on second monday of next month" />
     <MESSAGE value="solved handle status,pause,resume errors" />
     <MESSAGE value="solved reset_server and added polling resilience" />
     <MESSAGE value="solved some isssues about pause and resume, needs some modifications" />
@@ -472,7 +479,8 @@
     <MESSAGE value="Debugged trend class, now it is good, hurray what a good day, ooh i also made sure strength index does go below zero when conditions are well off" />
     <MESSAGE value="modified reversals logic to prevent duplication of zone type and guarded against misinterpretation by reversals" />
     <MESSAGE value="added trend detection by fetching and calculating using last three four our candles, added a flag and direction filter for signal to prevent noise, made trend on compare current highs and lows only" />
-    <option name="LAST_COMMIT_MESSAGE" value="added trend detection by fetching and calculating using last three four our candles, added a flag and direction filter for signal to prevent noise, made trend on compare current highs and lows only" />
+    <MESSAGE value="i realized when running on cmd sometimes the server slept for too long or missed untill i nudge it so it was vital to find solution, i now use threading on server loop with gracefull shutdown" />
+    <option name="LAST_COMMIT_MESSAGE" value="i realized when running on cmd sometimes the server slept for too long or missed untill i nudge it so it was vital to find solution, i now use threading on server loop with gracefull shutdown" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

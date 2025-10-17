@@ -141,7 +141,30 @@ class Reversal:
             return 0, 0
         return upper_wick, lower_wick
 
-
+    def size(self,c):
+        return abs(float(c["close"]) - float(c["open"]))
+    def candle_body_type(self, candle):
+        def upper_wick_size(c):
+            open_, close = float(c["open"]), float(c["close"])
+            high = float(c["high"])
+            return high - max(open_, close)
+        def lower_wick_size(c):
+            open_, close = float(c["open"]), float(c["close"])
+            low = float(c["low"])
+            return min(open_, close) - low
+        body_size = self.size(candle)
+        upper_wick = upper_wick_size(candle)
+        lower_wick = lower_wick_size(candle)
+        if upper_wick>2*body_size and lower_wick<0.3*body_size:
+            return "shooting_star"
+        elif lower_wick>2*body_size and upper_wick<0.3*body_size:
+            return "hammer"
+        elif upper_wick>4*body_size and lower_wick>4*body_size:
+            return "doji_wick"
+        elif body_size>4*(upper_wick+lower_wick):
+            return "marubozu"
+        else:
+            return "normal"
     def is_wick_reversal(self, candle, next_two,base_direction,tick_volume,ats_short,next1_direction):
         if base_direction not in ["up", "down"] :
             return None
@@ -188,6 +211,12 @@ class Reversal:
                 return f"🔺 Pullback Reversal (Up) at {ts}, size: ${size} and tick_volume: {tick_volume}"
         return None
 
+    def is_up(self,c):
+        return float(c["close"]) > float(c["open"])
+
+    def is_down(self,c):
+        return float(c["close"]) < float(c["open"])
+
     def engulfing_reversal(self, last_three, base_direction,tick_volume,ats_short):
         """
         Detects bullish or bearish engulfing reversal based on last three candles and base direction.
@@ -199,29 +228,19 @@ class Reversal:
 
         c1, c2, c3 = last_three  # c1 = next1, c2 = next2, c3 = next3
 
-        # Direction helpers
-        def is_up(c):
-            return float(c["close"]) > float(c["open"])
-
-        def is_down(c):
-            return float(c["close"]) < float(c["open"])
-
-        def body_size(c):
-            return abs(float(c["close"]) - float(c["open"]))
-
         # Sizes
-        size_c2 = body_size(c2)
-        size_c3 = body_size(c3)
+        size_c2 = self.size(c2)
+        size_c3 = self.size(c3)
 
         ts = datetime.now().strftime("%Y-%m-%d %H:%M")
 
         # 🔻 Bearish Engulfing Reversal
-        if base_direction == "up" and is_up(c1) and is_up(c2) and is_down(c3):
+        if base_direction == "up" and self.is_up(c1) and self.is_up(c2) and self.is_down(c3):
             if size_c3 > size_c2 and size_c3 >= 1.5*ats_short:
                 return f"🔻 Bearish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
 
         # 🔺 Bullish Engulfing Reversal
-        if base_direction == "down" and is_down(c1) and is_down(c2) and is_up(c3):
+        if base_direction == "down" and self.is_down(c1) and self.is_down(c2) and self.is_up(c3):
             if size_c3 > size_c2 and size_c3 >=1.5*ats_short:
                 return f"🔺 Bullish Engulfing Reversal at {ts}, size: ${round(size_c3, 2)} and tick_volume: {tick_volume}"
 
